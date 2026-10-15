@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "superpos-mobile",
-    "slug": "superpos-mobile",
+    "name": "DigiKart POS",
+    "slug": "digikart-pos",
     "version": "1.0.0",
     "orientation": "portrait",
+    "primaryColor": "#4F46B8",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
@@ -20,6 +21,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-sharing"
+    ]
   }
 }
