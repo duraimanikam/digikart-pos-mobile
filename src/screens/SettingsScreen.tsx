@@ -14,6 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { ScreenName } from './HomeScreen';
+import { PrintOptionsModal } from '../components/PrintOptionsModal';
+import { DEFAULT_SETTINGS } from '../database/sqlite';
+import { Invoice } from '../types';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -25,6 +28,42 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onNavigate,
 }) => {
   const [cloudSyncEnabled, setCloudSyncEnabled] = React.useState(true);
+  const [isPrinterModalOpen, setIsPrinterModalOpen] = React.useState(false);
+
+  // Test Invoice for Printer Testing
+  const sampleInvoice: Invoice = {
+    id: 'test-inv-001',
+    invoiceNo: 'TEST-0001',
+    date: new Date().toISOString(),
+    customerName: 'Test Customer (Counter)',
+    customerPhone: '9876543210',
+    isB2B: false,
+    isInterstate: false,
+    subtotal: 100.0,
+    discount: 0,
+    taxableAmount: 95.24,
+    totalCgst: 2.38,
+    totalSgst: 2.38,
+    totalIgst: 0,
+    grandTotal: 100.0,
+    paymentMode: 'Cash',
+    items: [
+      {
+        productId: 'p-1',
+        productName: 'Sample GST Test Product',
+        hsn: '2106',
+        quantity: 1,
+        unit: 'pcs',
+        unitPrice: 100.0,
+        gstRate: 5,
+        taxableAmount: 95.24,
+        cgstAmount: 2.38,
+        sgstAmount: 2.38,
+        igstAmount: 0,
+        totalAmount: 100.0,
+      },
+    ],
+  };
 
   const settingsList = [
     {
@@ -57,10 +96,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     },
     {
       id: 'printer',
-      title: 'Printer Settings',
+      title: 'Printer Settings (Wi-Fi & Bluetooth)',
       icon: 'print-outline',
       color: '#0284C7',
-      action: () => Alert.alert('Printer Settings', 'Thermal 80mm ESC/POS Printer connected'),
+      action: () => setIsPrinterModalOpen(true),
     },
     {
       id: 'backup_restore',
@@ -147,6 +186,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <Text style={styles.logoutBtnText}>Switch User / Logout</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Printer Configuration & Test Print Modal */}
+      <PrintOptionsModal
+        visible={isPrinterModalOpen}
+        onClose={() => setIsPrinterModalOpen(false)}
+        invoice={sampleInvoice}
+        settings={DEFAULT_SETTINGS}
+      />
     </SafeAreaView>
   );
 };

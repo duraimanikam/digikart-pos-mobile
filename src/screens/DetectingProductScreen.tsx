@@ -150,7 +150,7 @@ export const DetectingProductScreen: React.FC<DetectingProductScreenProps> = ({
             <Image
               source={{ uri: imageUri }}
               style={styles.capturedImage}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           ) : (
             <View style={styles.placeholderImg}>
@@ -434,11 +434,13 @@ const styles = StyleSheet.create({
   },
   imageCard: {
     width: '100%',
-    height: 220,
+    height: 280,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#0B0F19',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: '#1E293B',
     ...SHADOWS.card,
   },
   capturedImage: {

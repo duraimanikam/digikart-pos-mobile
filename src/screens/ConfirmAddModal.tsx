@@ -19,14 +19,17 @@ interface ConfirmAddModalProps {
   onAddItem: (product: Product, quantity: number, rate: number, discount: number) => void;
 }
 
-export const ConfirmAddModal: React.FC<ConfirmAddModalProps> = ({
-  visible,
+interface ConfirmAddModalContentProps {
+  product: Product;
+  onClose: () => void;
+  onAddItem: (product: Product, quantity: number, rate: number, discount: number) => void;
+}
+
+const ConfirmAddModalContent: React.FC<ConfirmAddModalContentProps> = ({
   product,
   onClose,
   onAddItem,
 }) => {
-  if (!product) return null;
-
   const [rate, setRate] = useState(product.sellingPrice.toFixed(2));
   const [qty, setQty] = useState(1);
   const [discount, setDiscount] = useState('0.00');
@@ -41,105 +44,115 @@ export const ConfirmAddModal: React.FC<ConfirmAddModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <SafeAreaView style={styles.container}>
-        {/* Header matching Screen 4 */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add to Bill</Text>
-          <View style={{ width: 24 }} />
+    <SafeAreaView style={styles.container}>
+      {/* Header matching Screen 4 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onClose} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Add to Bill</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <View style={styles.body}>
+        {/* Top Product Summary */}
+        <View style={styles.productBanner}>
+          <Image
+            source={{
+              uri:
+                product.image ||
+                'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=200&q=80',
+            }}
+            style={styles.productThumb}
+          />
+          <View style={styles.productDetails}>
+            <Text style={styles.productName}>{product.name}</Text>
+            <Text style={styles.productUnit}>{product.unit}</Text>
+          </View>
         </View>
 
-        <View style={styles.body}>
-          {/* Top Product Summary */}
-          <View style={styles.productBanner}>
-            <Image
-              source={{
-                uri:
-                  product.image ||
-                  'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=200&q=80',
-              }}
-              style={styles.productThumb}
+        {/* Form Fields matching Screen 4 */}
+        <View style={styles.card}>
+          {/* Rate (₹) */}
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>RATE (₹)</Text>
+            <TextInput
+              style={styles.textInput}
+              keyboardType="decimal-pad"
+              value={rate}
+              onChangeText={setRate}
+              placeholder="0.00"
+              placeholderTextColor="#94A3B8"
             />
-            <View style={styles.productDetails}>
-              <Text style={styles.productName}>{product.name}</Text>
-              <Text style={styles.productUnit}>{product.unit}</Text>
-            </View>
           </View>
 
-          {/* Form Fields matching Screen 4 */}
-          <View style={styles.card}>
-            {/* Rate (₹) */}
-            <View style={styles.formGroup}>
-              <Text style={styles.inputLabel}>Rate (₹)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={rate}
-                onChangeText={setRate}
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Qty with Stepper */}
-            <View style={styles.formGroup}>
-              <Text style={styles.inputLabel}>Qty</Text>
-              <View style={styles.qtyRow}>
-                <TextInput
-                  style={[styles.textInput, { flex: 1, marginRight: 12 }]}
-                  value={qty.toString()}
-                  onChangeText={(v) => setQty(parseInt(v, 10) || 1)}
-                  keyboardType="numeric"
-                />
-                <View style={styles.stepperContainer}>
-                  <TouchableOpacity
-                    style={styles.stepBtn}
-                    onPress={() => setQty((prev) => Math.max(1, prev - 1))}
-                  >
-                    <Ionicons name="remove" size={18} color="#475569" />
-                  </TouchableOpacity>
-                  <Text style={styles.stepQtyDisplay}>{qty}</Text>
-                  <TouchableOpacity
-                    style={styles.stepBtn}
-                    onPress={() => setQty((prev) => prev + 1)}
-                  >
-                    <Ionicons name="add" size={18} color="#475569" />
-                  </TouchableOpacity>
-                </View>
+          {/* Qty & Stepper */}
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>QUANTITY</Text>
+            <View style={styles.qtyRow}>
+              <View style={styles.stepperContainer}>
+                <TouchableOpacity
+                  onPress={() => setQty((prev) => Math.max(1, prev - 1))}
+                  style={styles.stepBtn}
+                >
+                  <Ionicons name="remove" size={16} color="#475569" />
+                </TouchableOpacity>
+                <Text style={styles.stepQtyDisplay}>{qty}</Text>
+                <TouchableOpacity
+                  onPress={() => setQty((prev) => prev + 1)}
+                  style={styles.stepBtn}
+                >
+                  <Ionicons name="add" size={16} color="#475569" />
+                </TouchableOpacity>
               </View>
             </View>
+          </View>
 
-            {/* Discount (₹) */}
-            <View style={styles.formGroup}>
-              <Text style={styles.inputLabel}>Discount (₹)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={discount}
-                onChangeText={setDiscount}
-                keyboardType="numeric"
-              />
-            </View>
+          {/* Discount */}
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>DISCOUNT (₹)</Text>
+            <TextInput
+              style={styles.textInput}
+              keyboardType="decimal-pad"
+              value={discount}
+              onChangeText={setDiscount}
+              placeholder="0.00"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
 
-            {/* Total Amount Callout */}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalVal}>{totalAmount.toFixed(2)}</Text>
-            </View>
+          {/* Calculated Total */}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TOTAL AMOUNT</Text>
+            <Text style={styles.totalVal}>₹{totalAmount.toFixed(2)}</Text>
           </View>
         </View>
+      </View>
 
-        {/* Bottom Buttons matching Screen 4 */}
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
+      {/* Footer Buttons */}
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+          <Text style={styles.cancelBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addItemBtn} onPress={handleConfirm}>
+          <Text style={styles.addItemBtnText}>Add Item</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
 
-          <TouchableOpacity style={styles.addItemBtn} onPress={handleConfirm} activeOpacity={0.8}>
-            <Text style={styles.addItemBtnText}>Add Item</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+export const ConfirmAddModal: React.FC<ConfirmAddModalProps> = ({
+  visible,
+  product,
+  onClose,
+  onAddItem,
+}) => {
+  if (!product) return null;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+      <ConfirmAddModalContent product={product} onClose={onClose} onAddItem={onAddItem} />
     </Modal>
   );
 };

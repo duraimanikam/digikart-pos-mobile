@@ -78,8 +78,19 @@ export const CustomerLedgerScreen: React.FC<CustomerLedgerScreenProps> = ({
   const [newCustGstin, setNewCustGstin] = useState('');
   const [newCustOpeningBal, setNewCustOpeningBal] = useState('0');
 
+  // Customer Dropdown Picker State
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+
   const selectedCustomer =
     customers.find((c) => c.id === selectedCustomerId) || customers[0];
+
+  const filteredDropdownCustomers = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+      c.phone.includes(customerSearchQuery) ||
+      (c.gstin && c.gstin.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+  );
 
   const transactions = ledgerMap[selectedCustomer.id] || [];
 
@@ -213,40 +224,54 @@ export const CustomerLedgerScreen: React.FC<CustomerLedgerScreenProps> = ({
         onRightPress={() => setIsNewCustModalOpen(true)}
       />
 
-      {/* Customer Switcher Strip */}
-      <View style={styles.customerSelectorStrip}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.customerChipsRow}>
-          {customers.map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              style={[
-                styles.customerChip,
-                c.id === selectedCustomerId && styles.customerChipActive,
-              ]}
-              onPress={() => setSelectedCustomerId(c.id)}
-            >
-              <Text
-                style={[
-                  styles.customerChipText,
-                  c.id === selectedCustomerId && styles.customerChipTextActive,
-                ]}
-              >
-                {c.name}
+      {/* Customer Switcher Dropdown */}
+      <View style={styles.customerDropdownStrip}>
+        <TouchableOpacity
+          style={styles.dropdownSelectorBtn}
+          onPress={() => setIsCustomerDropdownOpen(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.dropdownCustomerInfo}>
+            <View style={styles.dropdownAvatarCircle}>
+              <Text style={styles.dropdownAvatarText}>
+                {selectedCustomer.name.charAt(0).toUpperCase()}
               </Text>
-              {c.pendingCredit > 0 && (
-                <View style={styles.dueDot} />
-              )}
-            </TouchableOpacity>
-          ))}
+            </View>
+            <View style={styles.dropdownTextGroup}>
+              <View style={styles.dropdownNameRow}>
+                <Text style={styles.dropdownCustomerName} numberOfLines={1}>
+                  {selectedCustomer.name}
+                </Text>
+                {selectedCustomer.pendingCredit > 0 ? (
+                  <View style={styles.dropdownDueBadge}>
+                    <Text style={styles.dropdownDueText}>
+                      ₹{selectedCustomer.pendingCredit.toLocaleString('en-IN')} Due
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.dropdownClearBadge}>
+                    <Text style={styles.dropdownClearText}>Clear</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.dropdownCustomerPhone}>
+                {selectedCustomer.phone} {selectedCustomer.gstin ? `• ${selectedCustomer.gstin}` : ''}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.dropdownChevronBtn}>
+            <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+          </View>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.addCustomerChip}
-            onPress={() => setIsNewCustModalOpen(true)}
-          >
-            <Ionicons name="add" size={14} color={COLORS.primary} />
-            <Text style={styles.addCustomerChipText}>+ New Customer</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        <TouchableOpacity
+          style={styles.dropdownAddBtn}
+          onPress={() => setIsNewCustModalOpen(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-add" size={16} color="#FFFFFF" />
+          <Text style={styles.dropdownAddBtnText}>+ New</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -580,6 +605,111 @@ export const CustomerLedgerScreen: React.FC<CustomerLedgerScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* --- MODAL 3: SEARCHABLE CUSTOMER DROPDOWN PICKER --- */}
+      <Modal visible={isCustomerDropdownOpen} transparent animationType="fade" onRequestClose={() => setIsCustomerDropdownOpen(false)}>
+        <TouchableOpacity
+          style={styles.dropdownModalBackdrop}
+          activeOpacity={1}
+          onPress={() => setIsCustomerDropdownOpen(false)}
+        >
+          <View style={styles.dropdownModalCard}>
+            <View style={styles.dropdownModalHeader}>
+              <View style={styles.dropdownModalTitleRow}>
+                <Ionicons name="people" size={20} color={COLORS.primary} />
+                <Text style={styles.dropdownModalTitle}>Select Customer ({customers.length})</Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsCustomerDropdownOpen(false)}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View style={styles.dropdownSearchBox}>
+              <Ionicons name="search" size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.dropdownSearchInput}
+                placeholder="Search by name, phone or GSTIN..."
+                placeholderTextColor="#94A3B8"
+                value={customerSearchQuery}
+                onChangeText={setCustomerSearchQuery}
+              />
+              {customerSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setCustomerSearchQuery('')}>
+                  <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Customer List */}
+            <ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
+              {filteredDropdownCustomers.map((c) => {
+                const isSelected = c.id === selectedCustomerId;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[
+                      styles.dropdownListItem,
+                      isSelected && styles.dropdownListItemActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedCustomerId(c.id);
+                      setIsCustomerDropdownOpen(false);
+                      setCustomerSearchQuery('');
+                    }}
+                  >
+                    <View style={[styles.dropdownItemAvatar, isSelected && styles.dropdownItemAvatarActive]}>
+                      <Text style={[styles.dropdownItemAvatarText, isSelected && styles.dropdownItemAvatarTextActive]}>
+                        {c.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <View style={styles.dropdownItemContent}>
+                      <Text style={[styles.dropdownItemName, isSelected && styles.dropdownItemNameActive]} numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                      <Text style={styles.dropdownItemPhone}>
+                        {c.phone} {c.address ? `• ${c.address}` : ''}
+                      </Text>
+                    </View>
+
+                    <View style={styles.dropdownItemRight}>
+                      {c.pendingCredit > 0 ? (
+                        <Text style={styles.dropdownItemDueText}>
+                          ₹{c.pendingCredit.toLocaleString('en-IN')}
+                        </Text>
+                      ) : (
+                        <Text style={styles.dropdownItemZeroText}>₹0</Text>
+                      )}
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={18} color={COLORS.primary} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {filteredDropdownCustomers.length === 0 && (
+                <View style={styles.dropdownEmptyState}>
+                  <Text style={styles.dropdownEmptyText}>No matching customers found</Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Footer: + Add New Customer */}
+            <TouchableOpacity
+              style={styles.dropdownModalAddBtn}
+              onPress={() => {
+                setIsCustomerDropdownOpen(false);
+                setIsNewCustModalOpen(true);
+              }}
+            >
+              <Ionicons name="person-add" size={16} color="#FFFFFF" />
+              <Text style={styles.dropdownModalAddBtnText}>+ Add New Customer</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -589,59 +719,243 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  customerSelectorStrip: {
+  customerDropdownStrip: {
     backgroundColor: '#0F172A',
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
-  },
-  customerChipsRow: {
-    paddingHorizontal: 16,
-    gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  customerChip: {
+  dropdownSelectorBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  customerChipActive: {
+  dropdownCustomerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  dropdownAvatarCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  dropdownTextGroup: {
+    flex: 1,
+  },
+  dropdownNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownCustomerName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    maxWidth: 160,
+  },
+  dropdownDueBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  dropdownDueText: {
+    color: '#F87171',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  dropdownClearBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  dropdownClearText: {
+    color: '#34D399',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  dropdownCustomerPhone: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  dropdownChevronBtn: {
+    paddingLeft: 6,
+  },
+  dropdownAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 5,
+    ...SHADOWS.card,
+  },
+  dropdownAddBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  dropdownModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  dropdownModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '80%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    ...SHADOWS.card,
+  },
+  dropdownModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  dropdownModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownModalTitle: {
+    color: '#0F172A',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  dropdownSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    marginBottom: 12,
+  },
+  dropdownSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E293B',
+    fontWeight: '600',
+  },
+  dropdownList: {
+    maxHeight: 280,
+  },
+  dropdownListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  dropdownListItemActive: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  dropdownItemAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  dropdownItemAvatarActive: {
     backgroundColor: COLORS.primary,
   },
-  customerChipText: {
-    color: '#94A3B8',
+  dropdownItemAvatarText: {
+    color: '#475569',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  dropdownItemAvatarTextActive: {
+    color: '#FFFFFF',
+  },
+  dropdownItemContent: {
+    flex: 1,
+  },
+  dropdownItemName: {
+    color: '#1E293B',
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  dropdownItemNameActive: {
+    color: COLORS.primary,
+    fontWeight: '800',
+  },
+  dropdownItemPhone: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  dropdownItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownItemDueText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  dropdownItemZeroText: {
+    color: '#10B981',
     fontSize: 12,
     fontWeight: '700',
   },
-  customerChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+  dropdownEmptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
   },
-  dueDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EF4444',
+  dropdownEmptyText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  addCustomerChip: {
+  dropdownModalAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
   },
-  addCustomerChipText: {
-    color: COLORS.primary,
-    fontSize: 12,
+  dropdownModalAddBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
     fontWeight: '800',
   },
   body: {

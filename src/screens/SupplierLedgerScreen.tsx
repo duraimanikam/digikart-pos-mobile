@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { Product } from '../types';
+import { DetailedPurchaseEntryScreen } from './DetailedPurchaseEntryScreen';
 
 interface SupplierLedgerScreenProps {
   onBack: () => void;
@@ -459,153 +460,34 @@ export const SupplierLedgerScreen: React.FC<SupplierLedgerScreenProps> = ({
         </View>
       </ScrollView>
 
-      {/* --- MODAL 1: NEW PURCHASE INVOICE ENTRY --- */}
-      <Modal visible={isPurchaseModalOpen} transparent animationType="slide">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleBox}>
-                <Ionicons name="cart" size={20} color={COLORS.primary} />
-                <Text style={styles.modalTitle}>Inward Purchase Entry</Text>
-              </View>
-              <TouchableOpacity onPress={() => setIsPurchaseModalOpen(false)}>
-                <Ionicons name="close-circle" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalCustomerName}>
-              Supplier: <Text style={{ fontWeight: '800', color: COLORS.primary }}>{selectedSupplier.name}</Text>
-            </Text>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Invoice No */}
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Supplier Bill / Invoice No *</Text>
-                <TextInput
-                  style={styles.modalTextInput}
-                  placeholder="e.g. INV-2026-904"
-                  placeholderTextColor="#94A3B8"
-                  value={purchaseInvoiceNo}
-                  onChangeText={setPurchaseInvoiceNo}
-                  autoFocus={true}
-                />
-              </View>
-
-              {/* Product Selection */}
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Item / Product Name *</Text>
-                <TextInput
-                  style={styles.modalTextInput}
-                  placeholder="e.g. Aachi Turmeric Powder 500g"
-                  placeholderTextColor="#94A3B8"
-                  value={purchaseProductName}
-                  onChangeText={setPurchaseProductName}
-                />
-                {/* Catalog Quick Suggestion Chips */}
-                {products && products.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickProductChips}>
-                    {products.slice(0, 4).map((p) => (
-                      <TouchableOpacity
-                        key={p.id}
-                        style={styles.quickProdChip}
-                        onPress={() => {
-                          setPurchaseProductName(p.name);
-                          if (p.purchaseRate) setPurchaseRate(p.purchaseRate.toFixed(2));
-                        }}
-                      >
-                        <Text style={styles.quickProdChipText}>{p.name.split(' ')[0]}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-
-              {/* Qty & Rate Row */}
-              <View style={styles.twoColRow}>
-                <View style={[styles.modalInputGroup, styles.colHalf]}>
-                  <Text style={styles.modalLabel}>Inward Qty *</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    placeholder="50"
-                    placeholderTextColor="#94A3B8"
-                    value={purchaseQty}
-                    onChangeText={setPurchaseQty}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={[styles.modalInputGroup, styles.colHalf]}>
-                  <Text style={styles.modalLabel}>Purchase Rate (₹) *</Text>
-                  <TextInput
-                    style={styles.modalTextInput}
-                    placeholder="65.00"
-                    placeholderTextColor="#94A3B8"
-                    value={purchaseRate}
-                    onChangeText={setPurchaseRate}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-              </View>
-
-              {/* GST Rate */}
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>GST Tax Rate</Text>
-                <View style={styles.gstChipsRow}>
-                  {['0', '5', '12', '18', '28'].map((rate) => (
-                    <TouchableOpacity
-                      key={rate}
-                      style={[
-                        styles.gstChip,
-                        purchaseGst === rate && styles.gstChipActive,
-                      ]}
-                      onPress={() => setPurchaseGst(rate)}
-                    >
-                      <Text
-                        style={[
-                          styles.gstChipText,
-                          purchaseGst === rate && styles.gstChipTextActive,
-                        ]}
-                      >
-                        {rate}%
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Total Calculation Display */}
-              <View style={styles.calculationPreview}>
-                <Text style={styles.calcLabel}>Estimated Total Amount:</Text>
-                <Text style={styles.calcValue}>
-                  ₹
-                  {(
-                    (parseInt(purchaseQty, 10) || 0) *
-                    (parseFloat(purchaseRate) || 0) *
-                    (1 + (parseFloat(purchaseGst) || 0) / 100)
-                  ).toFixed(2)}
-                </Text>
-              </View>
-
-              {/* Actions */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.modalCancelBtn}
-                  onPress={() => setIsPurchaseModalOpen(false)}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.modalSubmitBtn}
-                  onPress={handleSavePurchaseEntry}
-                >
-                  <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
-                  <Text style={styles.modalSubmitText}>Save Inward Purchase</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
+      {/* --- MODAL 1: DETAILED PURCHASE INWARD ENTRY WITH PHOTO OCR & BARCODE SCAN --- */}
+      <Modal visible={isPurchaseModalOpen} animationType="slide">
+        <DetailedPurchaseEntryScreen
+          onBack={() => setIsPurchaseModalOpen(false)}
+          products={products || []}
+          onStockUpdated={(productId, inwardQty) => {
+            if (onStockUpdated) {
+              onStockUpdated(productId, inwardQty);
+            }
+          }}
+          onPurchaseCompleted={(supName, billNum, totalAmt) => {
+            const newTxn: SupplierTxn = {
+              id: `st-${Date.now()}`,
+              date: new Date().toLocaleDateString('en-IN'),
+              type: 'Purchase',
+              ref: billNum,
+              amt: totalAmt,
+              bal: currentBalance + totalAmt,
+              productName: `${supName} Inward`,
+              mode: 'Credit',
+            };
+            setSupplierLedgerMap((prev) => ({
+              ...prev,
+              [selectedSupplier.id]: [newTxn, ...(prev[selectedSupplier.id] || [])],
+            }));
+            setIsPurchaseModalOpen(false);
+          }}
+        />
       </Modal>
 
       {/* --- MODAL 2: RECORD PAYMENT TO SUPPLIER --- */}

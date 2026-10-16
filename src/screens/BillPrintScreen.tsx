@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,15 @@ import {
   StatusBar,
   ScrollView,
   TextInput,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { Invoice } from '../types';
 import { shareOnWhatsApp } from '../services/whatsappService';
+import { DEFAULT_SETTINGS } from '../database/sqlite';
+import { PrintOptionsModal } from '../components/PrintOptionsModal';
+import { receiptService } from '../services/receiptService';
 
 interface BillPrintScreenProps {
   invoice?: Invoice | null;
@@ -101,12 +103,57 @@ export const BillPrintScreen: React.FC<BillPrintScreenProps> = ({
     }
   };
 
+  const [isPrintOptionsOpen, setIsPrintOptionsOpen] = useState(false);
+
+  // Construct printable invoice object
+  const printableInvoice: Invoice = useMemo(
+    () =>
+      invoice || {
+        id: `inv-${displayBillNo}`,
+        invoiceNo: displayBillNo,
+        date: displayDate,
+        customerName: 'Cash Customer',
+        customerPhone: customerPhone,
+        isB2B: false,
+        isInterstate: false,
+        subtotal: 263.0,
+        discount: 0,
+        taxableAmount: 250.48,
+        totalCgst: 6.26,
+        totalSgst: 6.26,
+        totalIgst: 0,
+        grandTotal: 263.0,
+        paymentMode: 'Cash',
+        cashTendered: 300.0,
+        changeDue: 37.0,
+        items: defaultItems.map((it, idx) => ({
+          productId: `prod-00${idx + 1}`,
+          productName: it.name,
+          hsn: '2106',
+          quantity: it.qty,
+          unit: 'pcs',
+          unitPrice: it.rate,
+          gstRate: 5,
+          taxableAmount: it.amt * 0.95,
+          cgstAmount: it.amt * 0.025,
+          sgstAmount: it.amt * 0.025,
+          igstAmount: 0,
+          totalAmount: it.amt,
+        })),
+      },
+    [invoice, displayBillNo, displayDate, customerPhone]
+  );
+
   const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
-    } else {
-      Alert.alert('Printing Bill', `Thermal Receipt #${displayBillNo} sent to printer.`);
-    }
+    setIsPrintOptionsOpen(true);
+  };
+
+  const handleQuickWifiA4 = () => {
+    receiptService.printA4Wifi(printableInvoice, DEFAULT_SETTINGS);
+  };
+
+  const handleQuickBluetoothThermal = () => {
+    receiptService.printThermalBluetooth(printableInvoice, DEFAULT_SETTINGS, 80);
   };
 
   return (
@@ -234,15 +281,35 @@ export const BillPrintScreen: React.FC<BillPrintScreenProps> = ({
           <Text style={styles.receiptFooter}>Thank You! Visit Again.</Text>
         </View>
 
-        {/* Action Buttons */}
+        {/* Dual Action Buttons: Wi-Fi A4 vs Bluetooth Thermal */}
         <View style={styles.footerActionRow}>
           <TouchableOpacity
-            style={styles.thermalPrintBtn}
-            onPress={handlePrint}
+            style={[styles.thermalPrintBtn, { backgroundColor: '#2563EB' }]}
+            onPress={handleQuickWifiA4}
             activeOpacity={0.8}
           >
-            <Ionicons name="print" size={18} color="#FFFFFF" />
-            <Text style={styles.thermalPrintText}>Print Thermal Bill</Text>
+            <Ionicons name="wifi" size={17} color="#FFFFFF" />
+            <Text style={styles.thermalPrintText}>Wi-Fi (A4 GST)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.thermalPrintBtn, { backgroundColor: '#059669' }]}
+            onPress={handleQuickBluetoothThermal}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="bluetooth" size={17} color="#FFFFFF" />
+            <Text style={styles.thermalPrintText}>Bluetooth (Thermal)</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.footerActionRow, { marginTop: 8 }]}>
+          <TouchableOpacity
+            style={styles.morePrintBtn}
+            onPress={() => setIsPrintOptionsOpen(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="options-outline" size={17} color={COLORS.primary} />
+            <Text style={styles.morePrintText}>More Print & PDF Options</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -250,11 +317,19 @@ export const BillPrintScreen: React.FC<BillPrintScreenProps> = ({
             onPress={onNewBill}
             activeOpacity={0.8}
           >
-            <Ionicons name="add-circle-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.newBillActionText}>Start New Bill</Text>
+            <Ionicons name="add-circle-outline" size={17} color={COLORS.primary} />
+            <Text style={styles.newBillActionText}>New Bill</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Print Options Modal */}
+      <PrintOptionsModal
+        visible={isPrintOptionsOpen}
+        onClose={() => setIsPrintOptionsOpen(false)}
+        invoice={printableInvoice}
+        settings={DEFAULT_SETTINGS}
+      />
     </SafeAreaView>
   );
 };
@@ -439,25 +514,45 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   footerActionRow: {
-    marginTop: 18,
+    flexDirection: 'row',
     gap: 10,
+    marginTop: 10,
   },
   thermalPrintBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
     ...SHADOWS.card,
   },
   thermalPrintText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
+  morePrintBtn: {
+    flex: 1.4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    paddingVertical: 13,
+    borderRadius: 12,
+    gap: 6,
+  },
+  morePrintText: {
+    color: '#334155',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
   newBillActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -466,11 +561,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     paddingVertical: 13,
     borderRadius: 12,
-    gap: 8,
+    gap: 6,
   },
   newBillActionText: {
     color: COLORS.primary,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
 });

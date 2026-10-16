@@ -40,8 +40,7 @@ export const ScanProductScreen: React.FC<ScanProductScreenProps> = ({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false,
         quality: 0.9,
       });
 
@@ -63,8 +62,7 @@ export const ScanProductScreen: React.FC<ScanProductScreenProps> = ({
       if (status === 'granted') {
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
-          allowsEditing: true,
-          aspect: [4, 3],
+          allowsEditing: false,
           quality: 0.9,
         });
 

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Invoice, ShopSettings } from '../types';
-import { receiptService } from '../services/receiptService';
+import { PrintOptionsModal } from './PrintOptionsModal';
 
 interface ReceiptModalProps {
   visible: boolean;
@@ -26,10 +26,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   settings,
   onNewSale,
 }) => {
+  const [isPrintOptionsOpen, setIsPrintOptionsOpen] = React.useState(false);
+
   if (!invoice) return null;
 
   const handlePrintOrShare = () => {
-    receiptService.printOrShareReceipt(invoice, settings);
+    setIsPrintOptionsOpen(true);
   };
 
   const formattedDate = new Date(invoice.date).toLocaleString('en-IN', {
@@ -246,6 +248,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </View>
         </View>
       </View>
+
+      <PrintOptionsModal
+        visible={isPrintOptionsOpen}
+        onClose={() => setIsPrintOptionsOpen(false)}
+        invoice={invoice}
+        settings={settings}
+      />
     </Modal>
   );
 };

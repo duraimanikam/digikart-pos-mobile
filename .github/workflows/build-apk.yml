@@ -1,0 +1,92 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch: # Allows manual 1-click trigger from GitHub Actions UI
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+
+jobs:
+  build-apk:
+    name: Build Standalone Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 3. Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: 4. Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 5. Install Dependencies
+        run: npm install
+
+      - name: 6. Verify TypeScript Types
+        run: npx tsc --noEmit
+
+      - name: 7. Generate Native Android Project (CNG)
+        run: npx expo prebuild --platform android --clean
+
+      - name: 8. Grant Execute Permission to Gradle
+        run: chmod +x android/gradlew
+
+      - name: 9. Build Release / Debug APK with Gradle
+        run: |
+          cd android
+          ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
+
+      - name: 10. Locate Built APK File
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+
+      - name: 11. Upload APK Artifact to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: DigiKart-POS-Android-APK
+          path: ${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 30
+
+  eas-cloud-build:
+    name: Optional EAS Cloud Build (If EXPO_TOKEN is configured)
+    needs: build-apk
+    if: false # Set to true if you add EXPO_TOKEN to your GitHub Repository Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Standalone APK on EAS Cloud
+        run: eas build --platform android --profile preview --non-interactive
