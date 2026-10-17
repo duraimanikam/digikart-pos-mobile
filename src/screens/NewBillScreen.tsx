@@ -130,7 +130,7 @@ export const NewBillScreen: React.FC<NewBillScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.headerBg} />
 
       {/* Screen 5 Header */}
       <AppHeader title="New Bill" showBack={true} onBack={onBack} />

@@ -124,7 +124,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.headerBg} />
 
       {/* Screen 14 Header */}
       <AppHeader title="Accounts" showBack={true} onBack={onBack} />
@@ -132,20 +132,44 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {/* 6 Account Metric Cards Grid */}
         <View style={styles.metricsGrid}>
-          {accountMetrics.map((m) => (
-            <TouchableOpacity
-              key={m.id}
-              style={styles.metricCard}
-              onPress={m.onPress}
-              activeOpacity={m.onPress ? 0.7 : 1}
-            >
-              <View style={[styles.iconBox, { backgroundColor: m.iconBg }]}>
-                <Ionicons name={m.icon as any} size={20} color={m.iconColor} />
-              </View>
-              <Text style={styles.metricTitle}>{m.title}</Text>
-              <Text style={styles.metricValue}>{m.value}</Text>
-            </TouchableOpacity>
-          ))}
+          {accountMetrics.map((m, idx) => {
+            const cardBgs = [
+              COLORS.kpiGreenBg,
+              COLORS.kpiBlueBg,
+              COLORS.kpiOrangeBg,
+              COLORS.cardLogoutBg,
+              COLORS.kpiGreenBg,
+              COLORS.cardLogoutBg,
+            ];
+            const borderColors = [
+              COLORS.kpiGreenBorder,
+              COLORS.kpiBlueBorder,
+              COLORS.kpiOrangeBorder,
+              COLORS.cardLogoutBorder,
+              COLORS.kpiGreenBorder,
+              COLORS.cardLogoutBorder,
+            ];
+            return (
+              <TouchableOpacity
+                key={m.id}
+                style={[
+                  styles.metricCard,
+                  {
+                    backgroundColor: cardBgs[idx % cardBgs.length],
+                    borderColor: borderColors[idx % borderColors.length],
+                  },
+                ]}
+                onPress={m.onPress}
+                activeOpacity={m.onPress ? 0.7 : 1}
+              >
+                <View style={[styles.iconBox, { backgroundColor: m.iconBg }]}>
+                  <Ionicons name={m.icon as any} size={20} color={m.iconColor} />
+                </View>
+                <Text style={styles.metricTitle}>{m.title}</Text>
+                <Text style={styles.metricValue}>{m.value}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Recent Transactions Section */}

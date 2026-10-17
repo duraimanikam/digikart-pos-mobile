@@ -41,7 +41,7 @@ export const ProductsListScreen: React.FC<ProductsListScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.headerBg} />
 
       {/* Screen 6 Header matching Image 1 Screen 6 */}
       <AppHeader

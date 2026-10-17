@@ -213,7 +213,7 @@ export const CustomerLedgerScreen: React.FC<CustomerLedgerScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.headerBg} />
 
       {/* Screen Header */}
       <AppHeader

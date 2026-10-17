@@ -31,7 +31,7 @@ export const SalesReportsScreen: React.FC<SalesReportsScreenProps> = ({ onBack }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.headerBg} />
 
       {/* Screen 8 Header matching Image 1 Screen 8 */}
       <AppHeader title="Sales Reports" showBack={true} onBack={onBack} />
@@ -45,12 +45,12 @@ export const SalesReportsScreen: React.FC<SalesReportsScreenProps> = ({ onBack }
           </TouchableOpacity>
         </View>
 
-        {/* 4 Summary Cards Grid */}
+        {/* 4 Summary Cards Grid with Mild Pastel Colors */}
         <View style={styles.kpiGrid}>
           {/* Total Sales */}
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiTitle}>Total Sales</Text>
-            <Text style={styles.kpiValue}>₹ 25,680</Text>
+          <View style={[styles.kpiCard, { backgroundColor: COLORS.kpiGreenBg, borderColor: COLORS.kpiGreenBorder }]}>
+            <Text style={[styles.kpiTitle, { color: COLORS.kpiGreenText }]}>Total Sales</Text>
+            <Text style={[styles.kpiValue, { color: COLORS.kpiGreenText }]}>₹ 25,680</Text>
             <View style={styles.growthBadge}>
               <Ionicons name="arrow-up" size={11} color={COLORS.success} />
               <Text style={styles.growthText}>+12%</Text>
@@ -58,25 +58,25 @@ export const SalesReportsScreen: React.FC<SalesReportsScreenProps> = ({ onBack }
           </View>
 
           {/* Total Bills */}
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiTitle}>Total Bills</Text>
-            <Text style={styles.kpiValue}>84</Text>
-            <View style={styles.growthBadge}>
-              <Ionicons name="arrow-up" size={11} color={COLORS.success} />
-              <Text style={styles.growthText}>+8%</Text>
+          <View style={[styles.kpiCard, { backgroundColor: COLORS.kpiBlueBg, borderColor: COLORS.kpiBlueBorder }]}>
+            <Text style={[styles.kpiTitle, { color: COLORS.kpiBlueText }]}>Total Bills</Text>
+            <Text style={[styles.kpiValue, { color: COLORS.kpiBlueText }]}>84</Text>
+            <View style={[styles.growthBadge, { backgroundColor: COLORS.kpiBluePill }]}>
+              <Ionicons name="arrow-up" size={11} color={COLORS.kpiBlueText} />
+              <Text style={[styles.growthText, { color: COLORS.kpiBlueText }]}>+8%</Text>
             </View>
           </View>
 
           {/* Cash Sales */}
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiTitle}>Cash Sales</Text>
-            <Text style={styles.kpiValue}>₹ 18,240</Text>
+          <View style={[styles.kpiCard, { backgroundColor: COLORS.kpiPurpleBg, borderColor: COLORS.kpiPurpleBorder }]}>
+            <Text style={[styles.kpiTitle, { color: COLORS.kpiPurpleText }]}>Cash Sales</Text>
+            <Text style={[styles.kpiValue, { color: COLORS.kpiPurpleText }]}>₹ 18,240</Text>
           </View>
 
           {/* UPI / Card */}
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiTitle}>UPI / Card</Text>
-            <Text style={styles.kpiValue}>₹ 7,440</Text>
+          <View style={[styles.kpiCard, { backgroundColor: COLORS.kpiOrangeBg, borderColor: COLORS.kpiOrangeBorder }]}>
+            <Text style={[styles.kpiTitle, { color: COLORS.kpiOrangeText }]}>UPI / Card</Text>
+            <Text style={[styles.kpiValue, { color: COLORS.kpiOrangeText }]}>₹ 7,440</Text>
           </View>
         </View>
 

@@ -32,7 +32,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   return (
     <View style={styles.headerContainer}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.headerBg} />
       <View style={styles.leftContainer}>
         {showBack && onBack ? (
           <TouchableOpacity
@@ -41,7 +41,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={24} color={COLORS.headerIcon} />
           </TouchableOpacity>
         ) : showMenu ? (
           <TouchableOpacity
@@ -50,7 +50,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="menu" size={24} color="#FFFFFF" />
+            <Ionicons name="menu" size={24} color={COLORS.headerIcon} />
           </TouchableOpacity>
         ) : (
           <View style={{ width: 32 }} />
@@ -76,7 +76,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name={secondRightIcon} size={22} color="#FFFFFF" />
+            <Ionicons name={secondRightIcon} size={22} color={COLORS.headerIcon} />
           </TouchableOpacity>
         )}
         {rightIcon ? (
@@ -86,7 +86,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name={rightIcon} size={22} color="#FFFFFF" />
+            <Ionicons name={rightIcon} size={22} color={COLORS.headerIcon} />
           </TouchableOpacity>
         ) : (
           <View style={{ width: 24 }} />
@@ -106,6 +106,8 @@ const styles = StyleSheet.create({
     paddingTop: ANDROID_STATUS_BAR + 10,
     paddingBottom: 14,
     minHeight: ANDROID_STATUS_BAR + 56,
+    borderBottomWidth: 1.5,
+    borderBottomColor: COLORS.headerBorder,
   },
   leftContainer: {
     minWidth: 40,
@@ -117,15 +119,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   titleText: {
-    color: '#FFFFFF',
+    color: COLORS.headerText,
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.3,
   },
   subtitleText: {
-    color: '#E0E7FF',
+    color: COLORS.headerSubtitle,
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: 1,
   },
   rightContainer: {

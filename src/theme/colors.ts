@@ -1,16 +1,29 @@
 // DigiKart POS Design System Tokens
-// Updated to match TamilVelai Logo: Primary Dark Blue & Secondary Vibrant Orange
+// Top Menu Bar and Mild KPI Colors exactly matching client screenshot
 export const COLORS = {
-  // Primary Dark Blue from Logo (Header, Badges, Brand)
+  // Top Menu & Header (Exact RGB sampled from Screenshot: #E6F2FD)
+  headerBg: '#E6F2FD',
+  headerBorder: '#90CAF9',
+  headerText: '#131A4D',
+  headerSubtitle: '#475569',
+  headerIcon: '#1E88E5',
+
+  // Top Horizontal Menu Bar (Screenshot 1)
+  topMenuBg: '#E6F2FD',
+  topMenuBorder: '#90CAF9',
+  topMenuText: '#131A4D',
+  topMenuIcon: '#1E88E5',
+  topMenuChevron: '#2563EB',
+  topMenuMinimize: '#00C853',
+
+  // Primary Dark Blue
   primary: '#0A2540',
   primaryDark: '#061729',
   primaryLight: '#E8F0F8',
   primaryTint: '#F1F6FB',
   primaryMuted: '#1E3A8A',
-  headerBg: '#0A2540',
-  headerText: '#FFFFFF',
 
-  // Secondary Orange from Logo (Action Buttons, Highlights, Accents)
+  // Secondary Vibrant Orange
   secondary: '#FF6600',
   secondaryDark: '#E05300',
   secondaryLight: '#FFF2EB',
@@ -18,10 +31,72 @@ export const COLORS = {
   accent: '#FF6600',
 
   // Screen background & surfaces
-  background: '#F4F6F9',
+  background: '#F0F4F8',
   surface: '#FFFFFF',
   surfaceSubtle: '#F8FAFC',
   cardBg: '#FFFFFF',
+
+  // Mild KPI Card Colors (Exact RGB sampled from Screenshot 2)
+  kpiGreenBg: '#F0FEF7',
+  kpiGreenBorder: '#BBF7D0',
+  kpiGreenIcon: '#00C853',
+  kpiGreenText: '#15803D',
+  kpiGreenPill: '#DCFCE7',
+
+  kpiPurpleBg: '#FAF5FF',
+  kpiPurpleBorder: '#E9D5FF',
+  kpiPurpleIcon: '#9333EA',
+  kpiPurpleText: '#7E22CE',
+  kpiPurplePill: '#F3E8FF',
+
+  kpiOrangeBg: '#FFF7ED',
+  kpiOrangeBorder: '#FED7AA',
+  kpiOrangeIcon: '#EA580C',
+  kpiOrangeText: '#C2410C',
+  kpiOrangePill: '#FFEDD5',
+
+  kpiBlueBg: '#EFF6FF',
+  kpiBlueBorder: '#BFDBFE',
+  kpiBlueIcon: '#0284C7',
+  kpiBlueText: '#1D4ED8',
+  kpiBluePill: '#DBEAFE',
+
+  // Mild Quick Access Pastel Card Colors (Screenshot 2)
+  cardStockBg: '#F0F8FE',
+  cardStockBorder: '#DBEAFE',
+  cardStockIcon: '#0284C7',
+
+  cardRetailBg: '#FEF7F0',
+  cardRetailBorder: '#FED7AA',
+  cardRetailIcon: '#FF6600',
+
+  cardTouchBg: '#F4F1FD',
+  cardTouchBorder: '#E9D5FF',
+  cardTouchIcon: '#7C3AED',
+
+  cardPurchaseBg: '#F5F3FF',
+  cardPurchaseBorder: '#DDD6FE',
+  cardPurchaseIcon: '#8B5CF6',
+
+  cardCustomerBg: '#F0FDF4',
+  cardCustomerBorder: '#BBF7D0',
+  cardCustomerIcon: '#10B981',
+
+  cardSupplierBg: '#EFF6FF',
+  cardSupplierBorder: '#BFDBFE',
+  cardSupplierIcon: '#2563EB',
+
+  cardPaymentBg: '#F0FDFA',
+  cardPaymentBorder: '#99F6E4',
+  cardPaymentIcon: '#0D9488',
+
+  cardReceiptBg: '#FFFBEB',
+  cardReceiptBorder: '#FDE68A',
+  cardReceiptIcon: '#F59E0B',
+
+  cardLogoutBg: '#FFF1F2',
+  cardLogoutBorder: '#FECDD3',
+  cardLogoutIcon: '#E11D48',
 
   // Borders & Dividers
   border: '#E2E8F0',
