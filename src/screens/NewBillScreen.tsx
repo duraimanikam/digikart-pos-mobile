@@ -9,11 +9,14 @@ import {
   SafeAreaView,
   StatusBar,
   FlatList,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { CartItem, Product } from '../types';
+import { DedicatedBarcodeScannerModal } from '../components/DedicatedBarcodeScannerModal';
+import { VoiceItemEntryModal, VoiceParsedItem } from '../components/VoiceItemEntryModal';
 
 interface NewBillScreenProps {
   cart: CartItem[];
@@ -43,6 +46,74 @@ export const NewBillScreen: React.FC<NewBillScreenProps> = ({
   allProducts,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
+  const handleVoiceItemConfirmed = (item: VoiceParsedItem) => {
+    const matched = allProducts.find(
+      (p) =>
+        p.name.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(p.name.toLowerCase())
+    );
+
+    if (matched && onSelectProductToAdd) {
+      onSelectProductToAdd(matched);
+    } else if (onSelectProductToAdd) {
+      const dynamicProduct: Product = {
+        id: `voice-${Date.now()}`,
+        name: item.name,
+        brand: 'Direct Item',
+        category: 'staples',
+        barcode: `890${Date.now().toString().slice(-10)}`,
+        hsn: '2106',
+        mrp: item.price * 1.1,
+        purchaseRate: item.price * 0.8,
+        sellingPrice: item.price,
+        gstRate: 5,
+        stock: 50,
+        unit: item.unit,
+        keywords: [item.name.toLowerCase()],
+      };
+      onSelectProductToAdd(dynamicProduct);
+    }
+  };
+
+  const handleBarcodeScanned = (barcode: string) => {
+    const matched = allProducts.find((p) => p.barcode === barcode);
+    if (matched && onSelectProductToAdd) {
+      onSelectProductToAdd(matched);
+    } else {
+      Alert.alert(
+        'Barcode Scanned',
+        `Barcode: ${barcode} not found in catalog. Add new item?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add to Bill',
+            onPress: () => {
+              if (onSelectProductToAdd) {
+                onSelectProductToAdd({
+                  id: `scanned-${Date.now()}`,
+                  name: `Item #${barcode.slice(-4)}`,
+                  brand: 'Retail',
+                  category: 'staples',
+                  barcode,
+                  hsn: '2106',
+                  mrp: 100,
+                  purchaseRate: 75,
+                  sellingPrice: 95,
+                  gstRate: 5,
+                  stock: 50,
+                  unit: 'pcs',
+                  keywords: [],
+                });
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
 
   const totalItemsCount = cart.length;
   const totalQtyCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -77,14 +148,14 @@ export const NewBillScreen: React.FC<NewBillScreenProps> = ({
           />
           <TouchableOpacity
             style={styles.searchActionIcon}
-            onPress={onOpenScanner}
+            onPress={() => setIsVoiceModalOpen(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
+            <Ionicons name="mic" size={20} color={COLORS.secondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.searchActionIcon}
-            onPress={onOpenBarcodeScanner || onOpenScanner}
+            onPress={() => setIsBarcodeModalOpen(true)}
             activeOpacity={0.7}
           >
             <Ionicons name="barcode-outline" size={20} color={COLORS.primary} />
@@ -125,21 +196,26 @@ export const NewBillScreen: React.FC<NewBillScreenProps> = ({
             </View>
             <Text style={styles.emptyTitle}>Cart is Empty</Text>
             <Text style={styles.emptySubtitle}>
-              Scan a product photo, scan barcode, or search above to add items to this bill.
+              Scan barcode, speak item name with voice, or search above to add items to this bill.
             </Text>
 
             <View style={styles.emptyButtonsRow}>
-              <TouchableOpacity style={styles.emptyScanBtn} onPress={onOpenScanner}>
-                <Ionicons name="camera" size={18} color="#FFFFFF" />
-                <Text style={styles.emptyBtnText}>Scan Product Photo</Text>
+              <TouchableOpacity
+                style={styles.emptyScanBtn}
+                onPress={() => setIsBarcodeModalOpen(true)}
+              >
+                <Ionicons name="barcode-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.emptyBtnText}>Scan Barcode / QR</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.emptyBarcodeBtn}
-                onPress={onOpenBarcodeScanner || onOpenScanner}
+                onPress={() => setIsVoiceModalOpen(true)}
               >
-                <Ionicons name="barcode-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.emptyBarcodeBtnText}>Barcode Scan</Text>
+                <Ionicons name="mic" size={18} color={COLORS.secondary} />
+                <Text style={[styles.emptyBarcodeBtnText, { color: COLORS.secondary }]}>
+                  Voice Item Entry
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -270,6 +346,24 @@ export const NewBillScreen: React.FC<NewBillScreenProps> = ({
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Dedicated Barcode Scanner Modal */}
+      <DedicatedBarcodeScannerModal
+        visible={isBarcodeModalOpen}
+        onClose={() => setIsBarcodeModalOpen(false)}
+        onScan={handleBarcodeScanned}
+        title="Scan Product Barcode"
+        subtitle="Align product barcode in laser frame to add to bill"
+      />
+
+      {/* Voice to Item Entry Modal */}
+      <VoiceItemEntryModal
+        visible={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onItemConfirmed={handleVoiceItemConfirmed}
+        title="Voice Billing Entry"
+        targetScreen="billing"
+      />
     </SafeAreaView>
   );
 };

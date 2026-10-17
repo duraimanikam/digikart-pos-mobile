@@ -17,6 +17,8 @@ import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { Product } from '../types';
 import { dbService } from '../database/sqlite';
+import { DedicatedBarcodeScannerModal } from '../components/DedicatedBarcodeScannerModal';
+import { VoiceItemEntryModal, VoiceParsedItem } from '../components/VoiceItemEntryModal';
 import Tesseract from 'tesseract.js';
 
 interface PurchaseItemRow {
@@ -89,6 +91,84 @@ export const DetailedPurchaseEntryScreen: React.FC<DetailedPurchaseEntryScreenPr
 
   // Quick Barcode Lookup Input
   const [quickBarcode, setQuickBarcode] = useState('');
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
+  const handleVoiceItemConfirmed = (item: VoiceParsedItem) => {
+    const matched = products.find(
+      (p) =>
+        p.name.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(p.name.toLowerCase())
+    );
+
+    const newItem: PurchaseItemRow = {
+      id: `item-${Date.now()}`,
+      productId: matched?.id || `prod-${Date.now()}`,
+      name: item.name,
+      barcode: matched?.barcode || `${Math.floor(8900000000000 + Math.random() * 1000000000000)}`,
+      hsn: matched?.hsn || '2106',
+      quantity: item.quantity,
+      unit: item.unit,
+      purchaseRate: item.price,
+      sellingPrice: item.price * 1.25,
+      mrp: item.price * 1.3,
+      gstRate: matched?.gstRate || 5,
+      batchNo: `LOT-${Date.now().toString().slice(-4)}`,
+      expiryDate: '12/2027',
+    };
+    setItems((prev) => [newItem, ...prev]);
+    Alert.alert('Voice Item Added', `Added "${item.name}" (Qty: ${item.quantity}, Rate: ₹${item.price}) to inward list.`);
+  };
+
+  const handleDedicatedBarcodeScanned = (code: string) => {
+    const matched = products.find((p) => p.barcode === code);
+    if (matched) {
+      const existing = items.find((i) => i.productId === matched.id);
+      if (existing) {
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === existing.id ? { ...i, quantity: i.quantity + 10 } : i
+          )
+        );
+        Alert.alert('Inward Quantity Updated', `Added +10 qty to ${matched.name}.`);
+      } else {
+        const newItem: PurchaseItemRow = {
+          id: `item-${Date.now()}`,
+          productId: matched.id,
+          name: matched.name,
+          barcode: matched.barcode,
+          hsn: matched.hsn,
+          quantity: 25,
+          unit: matched.unit,
+          purchaseRate: matched.purchaseRate || matched.sellingPrice * 0.8,
+          sellingPrice: matched.sellingPrice,
+          mrp: matched.mrp,
+          gstRate: matched.gstRate,
+          batchNo: `LOT-${Math.floor(100 + Math.random() * 900)}`,
+          expiryDate: '12/2027',
+        };
+        setItems((prev) => [newItem, ...prev]);
+        Alert.alert('Scanned & Inwarded', `Added "${matched.name}" to purchase inward list.`);
+      }
+    } else {
+      const newItem: PurchaseItemRow = {
+        id: `item-${Date.now()}`,
+        name: `Carton Item #${code.slice(-4)}`,
+        barcode: code,
+        hsn: '2106',
+        quantity: 20,
+        unit: 'pcs',
+        purchaseRate: 60.0,
+        sellingPrice: 80.0,
+        mrp: 85.0,
+        gstRate: 5,
+        batchNo: `LOT-${Date.now().toString().slice(-4)}`,
+        expiryDate: '12/2027',
+      };
+      setItems((prev) => [newItem, ...prev]);
+      Alert.alert('New Barcode Inwarded', `Barcode "${code}" added to purchase table. You can edit price and item name.`);
+    }
+  };
 
   // 1. Take Live Photo of Paper Bill or Packaging
   const handleTakePhoto = async () => {
@@ -367,28 +447,28 @@ export const DetailedPurchaseEntryScreen: React.FC<DetailedPurchaseEntryScreenPr
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {/* Top Scan Actions Banner */}
         <View style={styles.topScanBanner}>
-          <Text style={styles.scanBannerTitle}>Fast Inward Input (Camera / OCR & Barcode)</Text>
+          <Text style={styles.scanBannerTitle}>Instant Purchase Inward (Barcode & Voice)</Text>
           <Text style={styles.scanBannerSub}>
-            Take photo of supplier bill or scan incoming carton barcodes for automated entry
+            Scan carton barcodes with laser scanner or speak item name, quantity & rate with voice
           </Text>
 
           <View style={styles.scanButtonsRow}>
             <TouchableOpacity
-              style={[styles.scanBtn, { backgroundColor: COLORS.primary }]}
-              onPress={handleTakePhoto}
+              style={[styles.scanBtn, { backgroundColor: COLORS.secondary }]}
+              onPress={() => setIsBarcodeScannerOpen(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="camera" size={18} color="#FFFFFF" />
-              <Text style={styles.scanBtnText}>Take Bill Photo</Text>
+              <Ionicons name="barcode-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.scanBtnText}>Scan Barcode / QR</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.scanBtn, { backgroundColor: '#0284C7' }]}
-              onPress={handlePickFromGallery}
+              style={[styles.scanBtn, { backgroundColor: COLORS.primary }]}
+              onPress={() => setIsVoiceModalOpen(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="image-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.scanBtnText}>Upload Bill</Text>
+              <Ionicons name="mic" size={18} color="#FFFFFF" />
+              <Text style={styles.scanBtnText}>Voice Inward Entry</Text>
             </TouchableOpacity>
           </View>
 
@@ -758,6 +838,24 @@ export const DetailedPurchaseEntryScreen: React.FC<DetailedPurchaseEntryScreenPr
           <Text style={styles.saveInwardBtnText}>Save & Inward Stock to Catalog</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Dedicated Barcode & QR Scanner Modal */}
+      <DedicatedBarcodeScannerModal
+        visible={isBarcodeScannerOpen}
+        onClose={() => setIsBarcodeScannerOpen(false)}
+        onScan={handleDedicatedBarcodeScanned}
+        title="Purchase Barcode Inward"
+        subtitle="Align carton or product barcode to add to inward list"
+      />
+
+      {/* Voice Inward Entry Modal */}
+      <VoiceItemEntryModal
+        visible={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onItemConfirmed={handleVoiceItemConfirmed}
+        title="Voice Purchase Inward"
+        targetScreen="purchase"
+      />
     </SafeAreaView>
   );
 };

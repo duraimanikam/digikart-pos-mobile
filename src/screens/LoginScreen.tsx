@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,12 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../theme/colors';
+import { dbService } from '../database/sqlite';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -19,8 +22,42 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('password123');
+  const [savedPassword, setSavedPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+
+  useEffect(() => {
+    dbService.getAdminPassword().then((pwd) => {
+      if (pwd) {
+        setSavedPassword(pwd);
+        setPassword(pwd);
+      }
+    });
+  }, []);
+
+  const handleSignIn = () => {
+    if (!username.trim()) {
+      Alert.alert('Login Required', 'Please enter your username.');
+      return;
+    }
+    if (password !== savedPassword) {
+      Alert.alert(
+        'Incorrect Password',
+        'The password entered does not match. (Default: password123)'
+      );
+      return;
+    }
+    onLoginSuccess();
+  };
+
+  const handleForgotPassword = () => {
+    Alert.alert(
+      'Account Password',
+      'The current admin password is: ' +
+        savedPassword +
+        '\n\nYou can also change your password anytime in Settings > Change Password.'
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -108,7 +145,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <Text style={styles.checkboxLabel}>Remember me</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleForgotPassword} activeOpacity={0.7}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>
@@ -116,7 +153,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {/* Sign In Button */}
           <TouchableOpacity
             style={styles.signInBtn}
-            onPress={onLoginSuccess}
+            onPress={handleSignIn}
             activeOpacity={0.8}
           >
             <Text style={styles.signInBtnText}>Sign In</Text>
@@ -140,6 +177,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0,
   },
   body: {
     padding: 24,

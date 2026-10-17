@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ShopSettings } from '../types';
+import { COLORS } from '../theme/colors';
 
 interface HeaderProps {
   settings: ShopSettings;
@@ -65,14 +66,14 @@ export const Header: React.FC<HeaderProps> = ({
         </View>
 
         <View style={styles.actionsContainer}>
-          {/* Snap & Bill Shortcut */}
+          {/* Scan Barcode Shortcut */}
           <TouchableOpacity
             style={styles.snapButton}
             onPress={onOpenPhotoBill}
             activeOpacity={0.8}
           >
-            <Ionicons name="camera" size={18} color="#FFFFFF" />
-            <Text style={styles.snapButtonText}>Snap & Bill</Text>
+            <Ionicons name="barcode-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.snapButtonText}>Scan Barcode</Text>
           </TouchableOpacity>
 
           {/* Cart Trigger */}
@@ -194,10 +195,10 @@ export const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0F172A',
+    backgroundColor: COLORS.headerBg,
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
-    paddingTop: Platform.OS === 'ios' ? 44 : 10,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 8 : (Platform.OS === 'ios' ? 44 : 10),
     paddingHorizontal: 16,
     paddingBottom: 4,
   },
@@ -275,12 +276,12 @@ const styles = StyleSheet.create({
   snapButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#6366F1',
+    backgroundColor: COLORS.secondary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     gap: 6,
-    shadowColor: '#6366F1',
+    shadowColor: COLORS.secondary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,

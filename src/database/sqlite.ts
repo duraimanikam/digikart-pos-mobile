@@ -404,6 +404,11 @@ class DatabaseService {
         currencySymbol TEXT,
         enableSound INTEGER
       );
+
+      CREATE TABLE IF NOT EXISTS app_kv (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
     `);
   }
 
@@ -691,6 +696,125 @@ class DatabaseService {
     await this.init();
     this.webSettings = { ...settings };
     try {
+      localStorage.setItem('digikart_settings_v2', JSON.stringify(this.webSettings));
+    } catch {}
+  }
+
+  // --- Admin Password Management ---
+  public async getAdminPassword(): Promise<string> {
+    await this.init();
+    if (this.nativeDb) {
+      try {
+        const row = await this.nativeDb.getFirstAsync<{ value: string }>(
+          'SELECT value FROM app_kv WHERE key = ?',
+          ['admin_password']
+        );
+        if (row?.value) return row.value;
+      } catch {}
+    }
+    try {
+      const stored = localStorage.getItem('digikart_admin_password_v1');
+      if (stored) return stored;
+    } catch {}
+    return 'password123';
+  }
+
+  public async setAdminPassword(newPassword: string): Promise<void> {
+    await this.init();
+    if (this.nativeDb) {
+      try {
+        await this.nativeDb.runAsync(
+          'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
+          ['admin_password', newPassword]
+        );
+      } catch {}
+    }
+    try {
+      localStorage.setItem('digikart_admin_password_v1', newPassword);
+    } catch {}
+  }
+
+  // --- Complete Post-Demo Reset ---
+  public async resetAllData(resetPassword = false): Promise<void> {
+    await this.init();
+    this.webInvoices = [];
+    this.webPayments = [];
+    this.webProducts = [...INITIAL_PRODUCTS];
+    this.webCustomers = INITIAL_CUSTOMERS.map((c) => ({
+      ...c,
+      totalPurchases: 0,
+      pendingCredit: 0,
+    }));
+    this.webCurrentShift = {
+      id: 'shift-new',
+      date: new Date().toLocaleDateString('en-GB'),
+      openedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      openedBy: 'Admin',
+      openingCash: 1000,
+      cashSales: 0,
+      gpaySales: 0,
+      phonepeSales: 0,
+      paytmSales: 0,
+      bankSales: 0,
+      creditSales: 0,
+      otherSales: 0,
+      totalExpenses: 0,
+      expectedCash: 1000,
+      status: 'OPEN',
+    };
+    this.webShiftHistory = [];
+    this.webSettings = { ...DEFAULT_SETTINGS };
+
+    if (resetPassword) {
+      await this.setAdminPassword('1234');
+    }
+
+    if (this.nativeDb) {
+      try {
+        await this.nativeDb.execAsync(`
+          DELETE FROM invoices;
+          DELETE FROM invoice_items;
+          DELETE FROM products;
+        `);
+      } catch (e) {
+        console.warn('Native DB reset invoices error:', e);
+      }
+
+      try {
+        await this.nativeDb.execAsync(`
+          DELETE FROM customers;
+          DELETE FROM register_shifts;
+        `);
+      } catch (e) {
+        console.warn('Native DB reset customers/shifts error:', e);
+      }
+
+      try {
+        await this.nativeDb.execAsync(`DELETE FROM customer_payments;`);
+      } catch {}
+
+      await this.seedNativeData();
+
+      try {
+        for (const c of this.webCustomers) {
+          await this.nativeDb.runAsync(
+            `INSERT OR REPLACE INTO customers (id, name, phone, email, gstin, address, totalPurchases, pendingCredit, lastVisit)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [c.id, c.name, c.phone, c.email || '', c.gstin || '', c.address || '', 0, 0, '']
+          );
+        }
+      } catch (e) {
+        console.warn('Native DB customer seed error:', e);
+      }
+    }
+
+    try {
+      localStorage.removeItem('digikart_invoices_v2');
+      localStorage.removeItem('digikart_payments_v2');
+      localStorage.removeItem('digikart_shift_history_v2');
+      localStorage.setItem('digikart_products_v2', JSON.stringify(this.webProducts));
+      localStorage.setItem('digikart_customers_v2', JSON.stringify(this.webCustomers));
+      localStorage.setItem('digikart_current_shift_v2', JSON.stringify(this.webCurrentShift));
       localStorage.setItem('digikart_settings_v2', JSON.stringify(this.webSettings));
     } catch {}
   }

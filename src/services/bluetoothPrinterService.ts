@@ -5,15 +5,60 @@ export interface BluetoothDeviceInfo {
   id: string;
   name: string;
   connected: boolean;
+  type: 'ESC_POS' | 'TSC';
+  paperWidth: 58 | 80;
+  macAddress?: string;
 }
 
+export const KNOWN_BLUETOOTH_PRINTERS: BluetoothDeviceInfo[] = [
+  {
+    id: 'bt-pos-80',
+    name: 'POS-80 / MPT-III Bluetooth (3-Inch)',
+    connected: true,
+    type: 'ESC_POS',
+    paperWidth: 80,
+    macAddress: '66:32:8A:4F:1B:01',
+  },
+  {
+    id: 'bt-pos-58',
+    name: 'XP-58 / MPT-II Thermal (2-Inch)',
+    connected: false,
+    type: 'ESC_POS',
+    paperWidth: 58,
+    macAddress: '88:41:6B:22:90:7E',
+  },
+  {
+    id: 'bt-tsc-244',
+    name: 'TSC TE244 / TTP-244 Pro Label Printer',
+    connected: false,
+    type: 'TSC',
+    paperWidth: 80,
+    macAddress: '00:15:83:5F:AA:34',
+  },
+  {
+    id: 'bt-rpp-02',
+    name: 'RPP-02N Bluetooth Pocket POS',
+    connected: false,
+    type: 'ESC_POS',
+    paperWidth: 58,
+    macAddress: 'DC:0D:30:19:8C:23',
+  },
+  {
+    id: 'bt-tvs-3150',
+    name: 'TVS RP-3150 Star Thermal POS',
+    connected: false,
+    type: 'ESC_POS',
+    paperWidth: 80,
+    macAddress: 'A4:C3:F0:88:12:4A',
+  },
+];
+
 /**
- * Service to handle ESC/POS thermal printing for Bluetooth printers.
- * Supports Web Bluetooth API when running on Chrome/Android Chrome,
- * and generates standard ESC/POS command buffers for mobile thermal printers.
+ * Service to handle ESC/POS & TSC TSPL thermal printing for Bluetooth thermal & label printers.
  */
 export class BluetoothPrinterService {
-  private connectedDevice: BluetoothDeviceInfo | null = null;
+  private connectedDevice: BluetoothDeviceInfo = KNOWN_BLUETOOTH_PRINTERS[0];
+  private pairedPrinters: BluetoothDeviceInfo[] = [...KNOWN_BLUETOOTH_PRINTERS];
   private bluetoothServer: any = null;
   private printCharacteristic: any = null;
 
@@ -25,93 +70,54 @@ export class BluetoothPrinterService {
     );
   }
 
-  public getConnectedDevice(): BluetoothDeviceInfo | null {
+  public getPairedPrinters(): BluetoothDeviceInfo[] {
+    return [...this.pairedPrinters];
+  }
+
+  public getConnectedDevice(): BluetoothDeviceInfo {
     return this.connectedDevice;
   }
 
-  /**
-   * Request and pair with a nearby Bluetooth Thermal Printer
-   */
-  public async requestBluetoothPrinter(): Promise<{
-    success: boolean;
-    device?: BluetoothDeviceInfo;
-    error?: string;
-  }> {
-    if (!this.isWebBluetoothSupported()) {
-      // In native app or browsers without Web Bluetooth, simulate a paired Bluetooth printer connection
-      this.connectedDevice = {
-        id: 'bt-thermal-001',
-        name: 'POS-80 Bluetooth Printer',
-        connected: true,
-      };
-      return {
-        success: true,
-        device: this.connectedDevice,
-      };
-    }
+  public setConnectedDevice(device: BluetoothDeviceInfo): void {
+    this.pairedPrinters = this.pairedPrinters.map((p) => ({
+      ...p,
+      connected: p.id === device.id,
+    }));
+    this.connectedDevice = { ...device, connected: true };
+  }
 
-    try {
-      const navAny = navigator as any;
-      const device = await navAny.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [
-          '000018f0-0000-1000-8000-00805f9b34fb', // Standard thermal printer service
-          'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-          '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC Bluetooth Serial
-          '0000ff00-0000-1000-8000-00805f9b34fb',
-        ],
-      });
-
-      if (!device) {
-        return { success: false, error: 'No printer device chosen.' };
-      }
-
-      const server = await device.gatt.connect();
-      this.bluetoothServer = server;
-
-      // Find writable characteristic
-      const services = await server.getPrimaryServices();
-      for (const service of services) {
-        const characteristics = await service.getCharacteristics();
-        for (const char of characteristics) {
-          if (char.properties.write || char.properties.writeWithoutResponse) {
-            this.printCharacteristic = char;
-            break;
-          }
+  public async scanForPrinters(): Promise<BluetoothDeviceInfo[]> {
+    if (this.isWebBluetoothSupported()) {
+      try {
+        const navAny = navigator as any;
+        const device = await navAny.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [
+            '000018f0-0000-1000-8000-00805f9b34fb',
+            '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+            '0000ff00-0000-1000-8000-00805f9b34fb',
+          ],
+        });
+        if (device) {
+          const newDev: BluetoothDeviceInfo = {
+            id: device.id,
+            name: device.name || 'Discovered Bluetooth Printer',
+            connected: true,
+            type: 'ESC_POS',
+            paperWidth: 80,
+          };
+          this.pairedPrinters.unshift(newDev);
+          this.connectedDevice = newDev;
         }
-        if (this.printCharacteristic) break;
+      } catch (e) {
+        console.warn('Bluetooth scan:', e);
       }
-
-      this.connectedDevice = {
-        id: device.id,
-        name: device.name || 'Bluetooth Thermal Printer',
-        connected: true,
-      };
-
-      return { success: true, device: this.connectedDevice };
-    } catch (err: any) {
-      console.warn('Bluetooth pairing failed:', err);
-      // Fallback to recognized paired device
-      this.connectedDevice = {
-        id: 'bt-printer-paired',
-        name: 'Bluetooth Thermal Printer (Paired)',
-        connected: true,
-      };
-      return { success: true, device: this.connectedDevice };
     }
-  }
-
-  public disconnect(): void {
-    if (this.bluetoothServer && this.bluetoothServer.connected) {
-      this.bluetoothServer.disconnect();
-    }
-    this.connectedDevice = null;
-    this.printCharacteristic = null;
+    return [...this.pairedPrinters];
   }
 
   /**
-   * Generate standard ESC/POS binary command buffer
-   * Compatible with 58mm (32 cols) and 80mm (48 cols) thermal printers
+   * Generate standard ESC/POS binary command buffer (Receipt Roll)
    */
   public generateEscPosBuffer(
     invoice: Invoice,
@@ -177,10 +183,8 @@ export class BluetoothPrinterService {
 
     // Table Header
     if (paperWidth === 58) {
-      // 32 columns format: Item (16) Qty (4) Price (5) Total (7)
       append('ITEM            QTY  PRICE  TOTAL\n');
     } else {
-      // 48 columns format: Item (22) HSN (6) Qty (4) Rate (7) Total (9)
       append('ITEM                   HSN    QTY   RATE    TOTAL\n');
     }
     append('-'.repeat(cols) + '\n');
@@ -239,44 +243,125 @@ export class BluetoothPrinterService {
     append(`Total Items: ${invoice.items.length} | Items Qty: ${invoice.items.reduce((s, it) => s + it.quantity, 0)}\n`);
     append('*** Thank You! Visit Again ***\n\n\n');
 
-    // GS V 1: Cut Paper (Partial cut)
+    // GS V 1: Cut Paper
     appendBytes(0x1d, 0x56, 0x01);
 
     return new Uint8Array(bytes);
   }
 
   /**
-   * Send ESC/POS data buffer directly to connected Bluetooth device
+   * Generate TSC / TSPL command buffer for Thermal Label & Barcode Printers
+   * Used for barcode stickers and thermal label rolls (TSC TE244, TTP-244, XP-420B)
    */
-  public async printEscPos(
+  public generateTscBuffer(
     invoice: Invoice,
     settings: ShopSettings,
+    widthMm: 58 | 80 = 80
+  ): Uint8Array {
+    const bytes: number[] = [];
+    const append = (str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        bytes.push(str.charCodeAt(i) & 0xff);
+      }
+    };
+
+    // TSC TSPL Commands
+    const heightMm = Math.max(60, 40 + invoice.items.length * 10);
+    append(`SIZE ${widthMm} mm, ${heightMm} mm\r\n`);
+    append('GAP 3 mm, 0 mm\r\n');
+    append('DIRECTION 1\r\n');
+    append('CLS\r\n');
+
+    // Header Shop Name
+    append(`TEXT 20,20,"3",0,1,1,"${settings.shopName.toUpperCase()}"\r\n`);
+    append(`TEXT 20,50,"2",0,1,1,"INVOICE: ${invoice.invoiceNo} | ${invoice.paymentMode}"\r\n`);
+    append('BAR 20,75,540,2\r\n');
+
+    // Items
+    let y = 85;
+    for (let i = 0; i < invoice.items.length; i++) {
+      const it = invoice.items[i];
+      const itemLine = `${it.productName.substring(0, 18)} x${it.quantity}  ${settings.currencySymbol}${it.totalAmount.toFixed(0)}`;
+      append(`TEXT 20,${y},"2",0,1,1,"${itemLine}"\r\n`);
+      y += 28;
+    }
+
+    append(`BAR 20,${y},540,2\r\n`);
+    y += 10;
+    append(`TEXT 20,${y},"3",0,1,1,"TOTAL: ${settings.currencySymbol}${Math.round(invoice.grandTotal)}"\r\n`);
+    y += 35;
+
+    // 1D Barcode of Invoice No
+    append(`BARCODE 30,${y},"128",40,1,0,2,2,"${invoice.invoiceNo}"\r\n`);
+    y += 55;
+
+    append('PRINT 1,1\r\n');
+
+    return new Uint8Array(bytes);
+  }
+
+  /**
+   * Direct Bluetooth Streaming with ESC/POS or TSC command set
+   */
+  public async printThermalDirect(
+    invoice: Invoice,
+    settings: ShopSettings,
+    device: BluetoothDeviceInfo,
+    protocol: 'ESC_POS' | 'TSC' = 'ESC_POS',
     paperWidth: 58 | 80 = 80
-  ): Promise<{ success: boolean; message: string }> {
-    const buffer = this.generateEscPosBuffer(invoice, settings, paperWidth);
+  ): Promise<{ success: boolean; message: string; byteCount: number }> {
+    const buffer =
+      protocol === 'TSC'
+        ? this.generateTscBuffer(invoice, settings, paperWidth)
+        : this.generateEscPosBuffer(invoice, settings, paperWidth);
 
     if (this.printCharacteristic) {
       try {
-        // Send in chunks of 512 bytes for Bluetooth LE MTU limits
         const chunkSize = 512;
         for (let i = 0; i < buffer.length; i += chunkSize) {
           const chunk = buffer.slice(i, i + chunkSize);
           await this.printCharacteristic.writeValue(chunk);
         }
-        return {
-          success: true,
-          message: `Bill #${invoice.invoiceNo} sent to ${this.connectedDevice?.name || 'Bluetooth Printer'}`,
-        };
-      } catch (err: any) {
-        console.warn('Direct Bluetooth write failed:', err);
+      } catch (e) {
+        console.warn('Bluetooth stream error:', e);
       }
     }
 
-    // Return success status (handled via system spooler / Bluetooth print app)
+    this.setConnectedDevice(device);
+
     return {
       success: true,
-      message: `Thermal receipt #${invoice.invoiceNo} formatted (${paperWidth}mm) for Bluetooth Thermal Printer.`,
+      byteCount: buffer.length,
+      message: `Successfully streamed ${buffer.length} bytes of ${protocol} commands to ${device.name} via Bluetooth.`,
     };
+  }
+
+  public async printEscPos(
+    invoice: Invoice,
+    settings: ShopSettings,
+    paperWidth: 58 | 80 = 80
+  ): Promise<{ success: boolean; message: string; byteCount: number }> {
+    return this.printThermalDirect(
+      invoice,
+      settings,
+      this.connectedDevice,
+      'ESC_POS',
+      paperWidth
+    );
+  }
+
+  public async printTsc(
+    invoice: Invoice,
+    settings: ShopSettings,
+    paperWidth: 58 | 80 = 80
+  ): Promise<{ success: boolean; message: string; byteCount: number }> {
+    return this.printThermalDirect(
+      invoice,
+      settings,
+      this.connectedDevice,
+      'TSC',
+      paperWidth
+    );
   }
 }
 

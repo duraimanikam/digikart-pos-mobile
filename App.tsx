@@ -281,6 +281,14 @@ export default function App() {
     });
   };
 
+  const handleResetComplete = async () => {
+    setCart([]);
+    const refreshed = await dbService.getProducts();
+    if (refreshed && refreshed.length > 0) {
+      setProducts(refreshed);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
@@ -392,6 +400,7 @@ export default function App() {
         <SettingsScreen
           onBack={() => setCurrentScreen('home')}
           onNavigate={setCurrentScreen}
+          onResetComplete={handleResetComplete}
         />
       )}
 

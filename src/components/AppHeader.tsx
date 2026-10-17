@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
+
+const ANDROID_STATUS_BAR = Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0;
 
 interface AppHeaderProps {
   title: string;
@@ -30,6 +32,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   return (
     <View style={styles.headerContainer}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
       <View style={styles.leftContainer}>
         {showBack && onBack ? (
           <TouchableOpacity
@@ -100,8 +103,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 56,
+    paddingTop: ANDROID_STATUS_BAR + 10,
+    paddingBottom: 14,
+    minHeight: ANDROID_STATUS_BAR + 56,
   },
   leftContainer: {
     minWidth: 40,

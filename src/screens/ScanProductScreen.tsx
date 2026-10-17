@@ -1,290 +1,244 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Image,
   SafeAreaView,
   StatusBar,
   Alert,
+  Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { AppHeader } from '../components/AppHeader';
-import { COLORS } from '../theme/colors';
+import { COLORS, SHADOWS } from '../theme/colors';
 import { Product } from '../types';
+import { VoiceItemEntryModal, VoiceParsedItem } from '../components/VoiceItemEntryModal';
 
 interface ScanProductScreenProps {
   onBack: () => void;
-  onPhotoCaptured: (imageUri: string, manualProduct?: Product, barcode?: string) => void;
+  onPhotoCaptured?: (imageUri: string, manualProduct?: Product, barcode?: string) => void;
   onBarcodeScanned?: (barcode: string) => void;
   availableProducts: Product[];
 }
 
 export const ScanProductScreen: React.FC<ScanProductScreenProps> = ({
   onBack,
-  onPhotoCaptured,
   onBarcodeScanned,
   availableProducts,
 }) => {
-  const [scanMode, setScanMode] = useState<'PHOTO' | 'BARCODE'>('PHOTO');
+  const [permission, requestPermission] = useCameraPermissions();
   const [flashOn, setFlashOn] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'back' | 'front'>('back');
-  const [previewProduct, setPreviewProduct] = useState<Product>(availableProducts[0]);
-  const [barcodeInput, setBarcodeInput] = useState(availableProducts[0]?.barcode || '');
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [scanned, setScanned] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [scanAnim] = useState(new Animated.Value(0));
 
-  // Gallery upload: upload any image to identify product via OCR
-  const handlePickFromGallery = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.9,
-      });
+  useEffect(() => {
+    // Laser sweep animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [scanAnim]);
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const uri = result.assets[0].uri;
-        onPhotoCaptured(uri, undefined, undefined);
-        return;
-      }
-    } catch (err) {
-      console.warn('Gallery pick error, fallback to simulated photo:', err);
-    }
-    onPhotoCaptured(previewProduct.image || '', previewProduct, undefined);
-  };
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (scanned || !data) return;
+    setScanned(true);
 
-  // Live Camera capture for Photo OCR
-  const handleLiveCameraCapture = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status === 'granted') {
-        const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          allowsEditing: false,
-          quality: 0.9,
-        });
-
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          const uri = result.assets[0].uri;
-          onPhotoCaptured(uri, undefined, undefined);
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn('Camera capture fallback:', err);
+    const code = data.trim();
+    if (onBarcodeScanned) {
+      onBarcodeScanned(code);
+    } else {
+      Alert.alert('Scanned', `Barcode: ${code}`);
     }
 
-    // Default to photo captured of product
-    onPhotoCaptured(previewProduct.image || '', previewProduct, undefined);
+    setTimeout(() => {
+      setScanned(false);
+    }, 2000);
   };
 
-  // DIRECT BARCODE SCANNING (Does NOT open OCR!)
-  const handleBarcodeSubmit = (customCode?: string) => {
-    const code = (customCode || barcodeInput || previewProduct.barcode).trim();
+  const handleManualSubmit = () => {
+    const code = barcodeInput.trim();
     if (!code) {
-      Alert.alert('Barcode Scanner', 'Please enter or scan a barcode number.');
+      Alert.alert('Barcode Scanner', 'Please enter a barcode number.');
       return;
     }
     if (onBarcodeScanned) {
       onBarcodeScanned(code);
-    } else {
-      // Fallback direct match without OCR
-      const matched = availableProducts.find((p) => p.barcode === code);
-      if (matched) {
-        onPhotoCaptured(matched.image || '', matched, code);
-      }
     }
   };
+
+  const handleVoiceItemConfirmed = (item: VoiceParsedItem) => {
+    // Look up product by name or add
+    const matched = availableProducts.find(
+      (p) =>
+        p.name.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(p.name.toLowerCase())
+    );
+    if (matched && onBarcodeScanned) {
+      onBarcodeScanned(matched.barcode);
+    } else if (onBarcodeScanned) {
+      // Use fallback barcode
+      onBarcodeScanned(`VOICE-${Date.now().toString().slice(-6)}`);
+    }
+  };
+
+  const laserTranslateY = scanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 210],
+  });
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.headerBg} />
 
-      {/* Screen 2 Header */}
+      {/* Screen Header */}
       <AppHeader
-        title={scanMode === 'PHOTO' ? 'Scan Product' : 'Barcode Scanner'}
+        title="Barcode & QR Scanner"
+        subtitle="Point camera at product barcode"
         showBack={true}
         onBack={onBack}
         rightIcon={flashOn ? 'flash' : 'flash-outline'}
         onRightPress={() => setFlashOn((prev) => !prev)}
+        secondRightIcon="camera-reverse-outline"
+        onSecondRightPress={() => setCameraFacing((f) => (f === 'back' ? 'front' : 'back'))}
       />
 
-      {/* Dual Mode Switcher Bar */}
-      <View style={styles.modeSwitcherBar}>
-        <TouchableOpacity
-          style={[styles.modeTab, scanMode === 'PHOTO' && styles.modeTabActive]}
-          onPress={() => setScanMode('PHOTO')}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name="camera-outline"
-            size={16}
-            color={scanMode === 'PHOTO' ? '#FFFFFF' : '#94A3B8'}
-          />
-          <Text style={[styles.modeTabText, scanMode === 'PHOTO' && styles.modeTabTextActive]}>
-            Photo OCR Scan
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modeTab, scanMode === 'BARCODE' && styles.modeTabActive]}
-          onPress={() => setScanMode('BARCODE')}
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name="barcode-outline"
-            size={16}
-            color={scanMode === 'BARCODE' ? '#FFFFFF' : '#94A3B8'}
-          />
-          <Text style={[styles.modeTabText, scanMode === 'BARCODE' && styles.modeTabTextActive]}>
-            Auto Barcode Scan
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Camera Viewfinder Viewport */}
-      <View style={styles.viewfinderContainer}>
-        {/* Background / Product Preview in Frame */}
-        {previewProduct.image ? (
-          <Image
-            source={{ uri: previewProduct.image }}
-            style={styles.cameraFeedImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.blankFeed}>
-            <Ionicons name="camera-outline" size={64} color="#94A3B8" />
-          </View>
-        )}
-
-        {/* Darkened overlay mask with clear center reticle */}
-        <View style={styles.maskContainer}>
-          {scanMode === 'PHOTO' ? (
-            <View style={styles.reticleFrame}>
-              {/* 4 Glowing Corner Brackets matching Screen 2 */}
-              <View style={[styles.cornerBracket, styles.topLeftBracket]} />
-              <View style={[styles.cornerBracket, styles.topRightBracket]} />
-              <View style={[styles.cornerBracket, styles.bottomLeftBracket]} />
-              <View style={[styles.cornerBracket, styles.bottomRightBracket]} />
+      {/* Live Viewfinder Area */}
+      <View style={styles.scannerWrapper}>
+        {!permission?.granted ? (
+          <View style={styles.permissionBox}>
+            <View style={styles.permIconCircle}>
+              <Ionicons name="barcode-outline" size={48} color={COLORS.secondary} />
             </View>
-          ) : (
-            /* Barcode Linear Reticle */
-            <View style={styles.barcodeReticle}>
-              <View style={styles.laserRedLine} />
-              <Text style={styles.barcodeInstructionText}>
-                Align barcode line within the laser
+            <Text style={styles.permTitle}>Camera Scanner Permission</Text>
+            <Text style={styles.permDesc}>
+              DigiKart POS uses real-time hardware scanning to instantly detect EAN-13, UPC, Code 128, and QR codes without taking photos.
+            </Text>
+            <TouchableOpacity style={styles.permBtn} onPress={requestPermission}>
+              <Text style={styles.permBtnText}>Enable Camera</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing={cameraFacing}
+            enableTorch={flashOn}
+            barcodeScannerSettings={{
+              barcodeTypes: [
+                'qr',
+                'ean13',
+                'ean8',
+                'code128',
+                'code39',
+                'upc_a',
+                'upc_e',
+                'codabar',
+                'itf14',
+              ],
+            }}
+            onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+          >
+            {/* Dark Mask with Clear Window */}
+            <View style={styles.overlay}>
+              <View style={styles.reticleFrame}>
+                <View style={[styles.corner, styles.tl]} />
+                <View style={[styles.corner, styles.tr]} />
+                <View style={[styles.corner, styles.bl]} />
+                <View style={[styles.corner, styles.br]} />
+
+                {/* Animated Red/Green Laser Beam */}
+                <Animated.View
+                  style={[
+                    styles.laserBeam,
+                    {
+                      transform: [{ translateY: laserTranslateY }],
+                      backgroundColor: scanned ? '#10B981' : '#EF4444',
+                    },
+                  ]}
+                />
+
+                {scanned && (
+                  <View style={styles.successBadge}>
+                    <Ionicons name="checkmark-circle" size={32} color="#10B981" />
+                    <Text style={styles.successText}>Code Scanned!</Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.aimInstruction}>
+                Auto-Scanning 1D Barcodes & 2D QR Codes
               </Text>
             </View>
-          )}
+          </CameraView>
+        )}
+      </View>
 
-          {/* Prompt banner matching Screen 2 */}
-          <View style={styles.instructionPill}>
-            <Text style={styles.instructionText}>
-              {scanMode === 'PHOTO'
-                ? 'Align the product within the frame'
-                : 'Point camera at product barcode'}
-            </Text>
+      {/* Bottom Control Bar */}
+      <View style={styles.bottomBar}>
+        {/* Voice Entry Shortcut */}
+        <TouchableOpacity
+          style={styles.voiceEntryBtn}
+          onPress={() => setIsVoiceModalOpen(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.voiceIconCircle}>
+            <Ionicons name="mic" size={20} color="#FFFFFF" />
           </View>
-        </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.voiceTitle}>Voice to Item Entry</Text>
+            <Text style={styles.voiceSub}>Speak item name & qty instead of scanning</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </TouchableOpacity>
 
-        {/* Quick Barcode Direct Input in Barcode Mode */}
-        {scanMode === 'BARCODE' && (
-          <View style={styles.barcodeInputCard}>
+        {/* Manual Barcode Input */}
+        <View style={styles.manualInputGroup}>
+          <Text style={styles.manualLabel}>Manual Barcode Digits:</Text>
+          <View style={styles.manualInputWrapper}>
+            <Ionicons name="barcode-outline" size={20} color={COLORS.secondary} />
             <TextInput
-              style={styles.barcodeInputField}
-              placeholder="Or type Barcode (e.g. 8906021123456)"
-              placeholderTextColor="#94A3B8"
+              style={styles.manualInput}
               value={barcodeInput}
               onChangeText={setBarcodeInput}
-              keyboardType="numeric"
+              onSubmitEditing={handleManualSubmit}
+              placeholder="e.g. 8906021123456"
+              placeholderTextColor="#94A3B8"
+              keyboardType="number-pad"
+              returnKeyType="done"
             />
-            <TouchableOpacity style={styles.barcodeGoBtn} onPress={() => handleBarcodeSubmit()}>
-              <Text style={styles.barcodeGoText}>Lookup</Text>
-            </TouchableOpacity>
+            {barcodeInput.length > 0 && (
+              <TouchableOpacity style={styles.addBtn} onPress={handleManualSubmit}>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-
-        {/* Quick Product Switcher for testing retail packages */}
-        <View style={styles.quickSamplesRow}>
-          <Text style={styles.sampleLabel}>
-            {scanMode === 'PHOTO' ? 'PHOTO SAMPLES:' : 'BARCODE SAMPLES:'}
-          </Text>
-          {availableProducts.slice(0, 4).map((p) => (
-            <TouchableOpacity
-              key={p.id}
-              style={[
-                styles.sampleChip,
-                previewProduct.id === p.id && styles.sampleChipActive,
-              ]}
-              onPress={() => {
-                setPreviewProduct(p);
-                setBarcodeInput(p.barcode);
-                if (scanMode === 'BARCODE') {
-                  // Direct barcode scan without OCR!
-                  handleBarcodeSubmit(p.barcode);
-                }
-              }}
-            >
-              <Text
-                style={[
-                  styles.sampleChipText,
-                  previewProduct.id === p.id && styles.sampleChipTextActive,
-                ]}
-                numberOfLines={1}
-              >
-                {p.name.split(' ')[0]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          {/* Special Chip: New Unknown Item (Tests "Name Not Found -> Add Name for New Product") */}
-          {scanMode === 'PHOTO' && (
-            <TouchableOpacity
-              style={[styles.sampleChip, styles.newSampleChip]}
-              onPress={() => {
-                onPhotoCaptured('assets/unknown_retail_pack.jpg', undefined, undefined);
-              }}
-            >
-              <Ionicons name="sparkles" size={12} color="#F59E0B" />
-              <Text style={styles.newSampleChipText}>+ New Product</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
-      {/* Bottom Controls Bar matching Screen 2 */}
-      <View style={styles.bottomControls}>
-        {/* Gallery / File Upload */}
-        <TouchableOpacity
-          style={styles.galleryBtn}
-          onPress={handlePickFromGallery}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="image-outline" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        {/* Large Shutter Button */}
-        <TouchableOpacity
-          style={styles.shutterOuterRing}
-          onPress={scanMode === 'PHOTO' ? handleLiveCameraCapture : () => handleBarcodeSubmit()}
-          activeOpacity={0.8}
-        >
-          <View style={styles.shutterInnerCircle} />
-        </TouchableOpacity>
-
-        {/* Switch Camera */}
-        <TouchableOpacity
-          style={styles.switchCamBtn}
-          onPress={() =>
-            setCameraFacing((f) => (f === 'back' ? 'front' : 'back'))
-          }
-          activeOpacity={0.7}
-        >
-          <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      {/* Voice Item Entry Modal */}
+      <VoiceItemEntryModal
+        visible={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onItemConfirmed={handleVoiceItemConfirmed}
+        title="Voice Item Entry"
+        targetScreen="billing"
+      />
     </SafeAreaView>
   );
 };
@@ -292,253 +246,201 @@ export const ScanProductScreen: React.FC<ScanProductScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0A2540',
+  },
+  scannerWrapper: {
+    flex: 1,
     backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modeSwitcherBar: {
-    flexDirection: 'row',
-    backgroundColor: '#0F172A',
-    padding: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-  },
-  modeTab: {
-    flex: 1,
-    flexDirection: 'row',
+  permissionBox: {
+    padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
   },
-  modeTabActive: {
-    backgroundColor: COLORS.primary,
+  permIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 102, 0, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  modeTabText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  modeTabTextActive: {
-    color: '#FFFFFF',
+  permTitle: {
+    fontSize: 18,
     fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
-  viewfinderContainer: {
+  permDesc: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  permBtn: {
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  permBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  overlay: {
     flex: 1,
-    position: 'relative',
-    backgroundColor: '#1E1E2E',
-    overflow: 'hidden',
-  },
-  cameraFeedImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  blankFeed: {
-    flex: 1,
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
-    backgroundColor: '#0F172A',
-  },
-  maskContainer: {
-    ...StyleSheet.absoluteFill,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
   },
   reticleFrame: {
-    width: '78%',
-    height: '56%',
+    width: 280,
+    height: 220,
+    borderRadius: 16,
     position: 'relative',
+    overflow: 'hidden',
   },
-  barcodeReticle: {
-    width: '80%',
-    height: 120,
-    borderWidth: 2,
-    borderColor: '#38BDF8',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  laserRedLine: {
-    width: '100%',
-    height: 2,
-    backgroundColor: '#EF4444',
-  },
-  barcodeInstructionText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    marginTop: 10,
-    fontWeight: '600',
-  },
-  cornerBracket: {
+  corner: {
     position: 'absolute',
-    width: 38,
-    height: 38,
-    borderColor: '#FFFFFF',
+    width: 28,
+    height: 28,
+    borderColor: COLORS.secondary,
   },
-  topLeftBracket: {
+  tl: {
     top: 0,
     left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
     borderTopLeftRadius: 16,
   },
-  topRightBracket: {
+  tr: {
     top: 0,
     right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
     borderTopRightRadius: 16,
   },
-  bottomLeftBracket: {
+  bl: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
     borderBottomLeftRadius: 16,
   },
-  bottomRightBracket: {
+  br: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
     borderBottomRightRadius: 16,
   },
-  instructionPill: {
-    marginTop: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+  laserBeam: {
+    height: 3,
+    width: '100%',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  instructionText: {
-    color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  barcodeInputCard: {
+  successBadge: {
     position: 'absolute',
-    top: 14,
-    left: 14,
-    right: 14,
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 6,
-    gap: 8,
-  },
-  barcodeInputField: {
-    flex: 1,
-    paddingHorizontal: 10,
-    fontSize: 13,
-    color: COLORS.textPrimary,
-    fontWeight: '600',
-  },
-  barcodeGoBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(16, 185, 129, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 14,
   },
-  barcodeGoText: {
+  successText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  aimInstruction: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
-  },
-  quickSamplesRow: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    fontWeight: '700',
+    marginTop: 20,
+    backgroundColor: 'rgba(10, 37, 64, 0.85)',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 6,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  sampleLabel: {
-    color: '#CBD5E1',
-    fontSize: 10,
-    fontWeight: '800',
-    marginRight: 4,
-  },
-  sampleChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  sampleChipActive: {
-    backgroundColor: COLORS.primary,
-  },
-  sampleChipText: {
-    color: '#CBD5E1',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sampleChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  newSampleChip: {
-    backgroundColor: '#78350F',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  newSampleChipText: {
-    color: '#FDE68A',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  bottomControls: {
-    height: 105,
-    backgroundColor: '#000000',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 24,
-  },
-  galleryBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shutterOuterRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  shutterInnerCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+  bottomBar: {
     backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+    ...SHADOWS.floating,
   },
-  switchCamBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  voiceEntryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF2EB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FFD8C2',
+    padding: 12,
+    gap: 12,
+    marginBottom: 12,
+  },
+  voiceIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0A2540',
+  },
+  voiceSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  manualInputGroup: {},
+  manualLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  manualInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    height: 46,
+    gap: 10,
+  },
+  manualInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },

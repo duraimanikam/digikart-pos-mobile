@@ -7,9 +7,12 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../theme/colors';
+
+const ANDROID_STATUS_BAR = Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0;
 
 export type ScreenName =
   | 'home'
@@ -71,17 +74,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {/* 8 Action Tiles Grid - Exactly matching Screen 1 */}
         <View style={styles.grid}>
-          {/* 1. Scan Product (Take Photo) - Active Highlighted Card */}
+          {/* 1. Barcode & QR Scanner (Dedicated Real-time Camera Scanner) */}
           <TouchableOpacity
             style={[styles.tileCard, styles.tileCardActive]}
             onPress={() => onNavigate('scan_photo')}
             activeOpacity={0.8}
           >
             <View style={styles.iconBox}>
-              <Ionicons name="camera" size={32} color={COLORS.primary} />
+              <Ionicons name="barcode-outline" size={34} color={COLORS.secondary} />
             </View>
-            <Text style={styles.tileTitleActive}>Scan Product</Text>
-            <Text style={styles.tileSubActive}>(Take Photo)</Text>
+            <Text style={styles.tileTitleActive}>Barcode Scanner</Text>
+            <Text style={styles.tileSubActive}>(Dedicated 1D & QR)</Text>
           </TouchableOpacity>
 
           {/* 2. New Bill */}
@@ -250,7 +253,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: ANDROID_STATUS_BAR + 10,
+    paddingBottom: 14,
   },
   iconBtn: {
     padding: 4,

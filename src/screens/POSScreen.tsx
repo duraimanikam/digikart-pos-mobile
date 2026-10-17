@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Product, CartItem, ShopSettings } from '../types';
 import { INITIAL_CATEGORIES } from '../database/sqlite';
 import { ProductCard } from '../components/ProductCard';
+import { COLORS } from '../theme/colors';
 
 interface POSScreenProps {
   products: Product[];
@@ -19,7 +20,7 @@ interface POSScreenProps {
   settings: ShopSettings;
   onAddToCart: (product: Product) => void;
   onOpenCart: () => void;
-  onOpenPhotoBill: () => void;
+  onOpenBarcodeScanner?: () => void;
 }
 
 export const POSScreen: React.FC<POSScreenProps> = ({
@@ -28,7 +29,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   settings,
   onAddToCart,
   onOpenCart,
-  onOpenPhotoBill,
+  onOpenBarcodeScanner,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -172,16 +173,18 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <Ionicons name="search-outline" size={54} color="#334155" />
             <Text style={styles.emptyTitle}>No matching products found</Text>
             <Text style={styles.emptySub}>
-              Try a different keyword or tap "Snap & Bill" to scan packaging with your camera.
+              Try a different keyword or scan the product barcode using your camera.
             </Text>
-            <TouchableOpacity
-              style={styles.emptySnapBtn}
-              onPress={onOpenPhotoBill}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="camera" size={18} color="#FFFFFF" />
-              <Text style={styles.emptySnapText}>Snap & Bill Photo</Text>
-            </TouchableOpacity>
+            {onOpenBarcodeScanner && (
+              <TouchableOpacity
+                style={styles.emptySnapBtn}
+                onPress={onOpenBarcodeScanner}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="barcode-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.emptySnapText}>Scan Barcode / QR</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <FlatList

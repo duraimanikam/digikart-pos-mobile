@@ -7,11 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { Invoice, ShopSettings } from '../types';
 import { receiptService } from '../services/receiptService';
+import {
+  bluetoothPrinterService,
+  BluetoothDeviceInfo,
+} from '../services/bluetoothPrinterService';
 
 interface PrintOptionsModalProps {
   visible: boolean;
@@ -26,12 +31,21 @@ export const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({
   invoice,
   settings,
 }) => {
+  const [printMode, setPrintMode] = useState<'BLUETOOTH' | 'WIFI'>('BLUETOOTH');
+  const [bluetoothPrinters] = useState<BluetoothDeviceInfo[]>(() =>
+    bluetoothPrinterService.getPairedPrinters()
+  );
+  const [selectedDevice, setSelectedDevice] = useState<BluetoothDeviceInfo>(() =>
+    bluetoothPrinterService.getConnectedDevice()
+  );
+  const [protocol, setProtocol] = useState<'ESC_POS' | 'TSC'>('ESC_POS');
   const [paperWidth, setPaperWidth] = useState<58 | 80>(80);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState<string | null>(null);
 
   if (!invoice) return null;
 
+  // Wi-Fi / LAN Printer: Uses system network print spooler
   const handlePrintWifiA4 = async () => {
     setIsPrinting(true);
     setPrintStatus('Generating A4 GST Tax Invoice for Wi-Fi Printer...');
@@ -41,8 +55,8 @@ export const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({
       setPrintStatus(null);
       if (res.success) {
         Alert.alert(
-          'Wi-Fi Printer',
-          `Full A4 GST Tax Invoice #${invoice.invoiceNo} successfully prepared for Wi-Fi / Network printer.`
+          'Wi-Fi Printer Prepared',
+          `Full A4 GST Tax Invoice #${invoice.invoiceNo} sent to Wi-Fi / Network printer.`
         );
         onClose();
       }
@@ -53,25 +67,38 @@ export const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({
     }
   };
 
-  const handlePrintBluetoothThermal = async () => {
+  // Bluetooth Printer: Direct ESC/POS or TSC TSPL byte streaming WITHOUT Wi-Fi dialog
+  const handlePrintBluetoothDirect = async () => {
     setIsPrinting(true);
-    setPrintStatus(`Connecting & streaming to Bluetooth Thermal Printer (${paperWidth}mm)...`);
-    try {
-      const res = await receiptService.printThermalBluetooth(invoice, settings, paperWidth);
-      setIsPrinting(false);
-      setPrintStatus(null);
-      if (res.success) {
-        Alert.alert(
-          'Bluetooth Thermal Print',
-          `Thermal bill #${invoice.invoiceNo} (${paperWidth}mm) sent to Bluetooth printer.`
+    setPrintStatus(`Connecting to ${selectedDevice.name} via Bluetooth...`);
+
+    setTimeout(async () => {
+      try {
+        setPrintStatus(`Streaming ${protocol} binary commands to ${selectedDevice.name}...`);
+        const result = await bluetoothPrinterService.printThermalDirect(
+          invoice,
+          settings,
+          selectedDevice,
+          protocol,
+          paperWidth
         );
-        onClose();
+
+        setIsPrinting(false);
+        setPrintStatus(null);
+
+        Alert.alert(
+          '🖨️ Bluetooth Print Successful',
+          `Sent ${result.byteCount} bytes of ${protocol} commands to ${selectedDevice.name} (${paperWidth}mm).\n\nMode: ${
+            protocol === 'TSC' ? 'TSC TSPL Barcode Label' : 'ESC/POS Receipt Roll'
+          }`,
+          [{ text: 'OK', onPress: onClose }]
+        );
+      } catch (err: any) {
+        setIsPrinting(false);
+        setPrintStatus(null);
+        Alert.alert('Bluetooth Error', err?.message || 'Failed to stream to Bluetooth printer');
       }
-    } catch (err: any) {
-      setIsPrinting(false);
-      setPrintStatus(null);
-      Alert.alert('Bluetooth Error', err?.message || 'Failed to print via Bluetooth');
-    }
+    }, 700);
   };
 
   const handleShareA4Pdf = async () => {
@@ -115,7 +142,7 @@ export const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({
               <View>
                 <Text style={styles.headerTitle}>Print Bill #{invoice.invoiceNo}</Text>
                 <Text style={styles.headerSubtitle}>
-                  Choose your printer type: Wi-Fi A4 or Bluetooth Thermal
+                  Select your dedicated printer type below
                 </Text>
               </View>
             </View>
@@ -124,122 +151,266 @@ export const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({
             </TouchableOpacity>
           </View>
 
+          {/* Mode Switcher Tabs */}
+          <View style={styles.tabSwitcher}>
+            <TouchableOpacity
+              style={[
+                styles.tabBtn,
+                printMode === 'BLUETOOTH' && styles.tabBtnActive,
+              ]}
+              onPress={() => setPrintMode('BLUETOOTH')}
+            >
+              <Ionicons
+                name="bluetooth"
+                size={18}
+                color={printMode === 'BLUETOOTH' ? '#FFFFFF' : '#64748B'}
+              />
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  printMode === 'BLUETOOTH' && styles.tabBtnTextActive,
+                ]}
+              >
+                Bluetooth Thermal
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.tabBtn,
+                printMode === 'WIFI' && styles.tabBtnActive,
+              ]}
+              onPress={() => setPrintMode('WIFI')}
+            >
+              <Ionicons
+                name="wifi"
+                size={18}
+                color={printMode === 'WIFI' ? '#FFFFFF' : '#64748B'}
+              />
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  printMode === 'WIFI' && styles.tabBtnTextActive,
+                ]}
+              >
+                Wi-Fi (A4 GST)
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {isPrinting ? (
             <View style={styles.printingStateBox}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
+              <ActivityIndicator size="large" color={COLORS.secondary} />
               <Text style={styles.printingStateText}>{printStatus}</Text>
             </View>
           ) : (
-            <View style={styles.optionsList}>
-              {/* Option 1: Wi-Fi / Network Printer (A4 GST Invoice) */}
-              <TouchableOpacity
-                style={styles.printerCard}
-                onPress={handlePrintWifiA4}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.cardIconBox, { backgroundColor: '#3B82F6' }]}>
-                  <Ionicons name="wifi" size={26} color="#FFFFFF" />
-                </View>
-                <View style={styles.cardContent}>
-                  <View style={styles.cardTitleRow}>
-                    <Text style={styles.cardTitle}>Wi-Fi / Network Printer</Text>
-                    <View style={styles.a4Badge}>
-                      <Text style={styles.a4BadgeText}>A4 GST INVOICE</Text>
+            <ScrollView
+              style={styles.scrollBody}
+              showsVerticalScrollIndicator={false}
+            >
+              {printMode === 'BLUETOOTH' ? (
+                /* --- DEDICATED BLUETOOTH PRINTER SECTION --- */
+                <View style={styles.bluetoothSection}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionLabel}>Paired Bluetooth Printers:</Text>
+                    <View style={styles.onlineBadge}>
+                      <View style={styles.greenDot} />
+                      <Text style={styles.onlineBadgeText}>Bluetooth Ready</Text>
                     </View>
                   </View>
-                  <Text style={styles.cardDesc}>
-                    Print official statutory A4 GST Tax Invoice with HSN summary, bank details & signature on any Wi-Fi or LAN printer.
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-              </TouchableOpacity>
 
-              {/* Option 2: Bluetooth Thermal Printer */}
-              <View style={styles.thermalCardWrapper}>
-                <TouchableOpacity
-                  style={styles.printerCard}
-                  onPress={handlePrintBluetoothThermal}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.cardIconBox, { backgroundColor: '#10B981' }]}>
-                    <Ionicons name="bluetooth" size={26} color="#FFFFFF" />
+                  {/* List of Dedicated Bluetooth Printers */}
+                  <View style={styles.deviceList}>
+                    {bluetoothPrinters.map((dev) => {
+                      const isSelected = selectedDevice.id === dev.id;
+                      return (
+                        <TouchableOpacity
+                          key={dev.id}
+                          style={[
+                            styles.deviceCard,
+                            isSelected && styles.deviceCardSelected,
+                          ]}
+                          onPress={() => {
+                            setSelectedDevice(dev);
+                            setPaperWidth(dev.paperWidth);
+                            setProtocol(dev.type);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <View
+                            style={[
+                              styles.deviceIconCircle,
+                              isSelected && { backgroundColor: COLORS.secondary },
+                            ]}
+                          >
+                            <Ionicons
+                              name="bluetooth"
+                              size={20}
+                              color={isSelected ? '#FFFFFF' : '#64748B'}
+                            />
+                          </View>
+                          <View style={styles.deviceInfo}>
+                            <Text style={styles.deviceName}>{dev.name}</Text>
+                            <Text style={styles.deviceSub}>
+                              {dev.type === 'TSC' ? 'TSC TSPL (Label/Sticker)' : 'ESC/POS (Thermal Receipt)'} • {dev.paperWidth}mm
+                            </Text>
+                          </View>
+                          <Ionicons
+                            name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                            size={22}
+                            color={isSelected ? COLORS.secondary : '#CBD5E1'}
+                          />
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <View style={styles.cardContent}>
-                    <View style={styles.cardTitleRow}>
-                      <Text style={styles.cardTitle}>Bluetooth Thermal Printer</Text>
-                      <View style={styles.thermalBadge}>
-                        <Text style={styles.thermalBadgeText}>{paperWidth}mm SLIP</Text>
+
+                  {/* Protocol Selector: ESC/POS vs TSC TSPL */}
+                  <View style={styles.configBlock}>
+                    <Text style={styles.configLabel}>Thermal Command Set:</Text>
+                    <View style={styles.pillRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.pill,
+                          protocol === 'ESC_POS' && styles.pillActive,
+                        ]}
+                        onPress={() => setProtocol('ESC_POS')}
+                      >
+                        <Text
+                          style={[
+                            styles.pillText,
+                            protocol === 'ESC_POS' && styles.pillTextActive,
+                          ]}
+                        >
+                          ESC/POS (Standard Receipt)
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.pill,
+                          protocol === 'TSC' && styles.pillActive,
+                        ]}
+                        onPress={() => setProtocol('TSC')}
+                      >
+                        <Text
+                          style={[
+                            styles.pillText,
+                            protocol === 'TSC' && styles.pillTextActive,
+                          ]}
+                        >
+                          TSC TSPL (Barcode Label)
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Roll Width Selector */}
+                  <View style={styles.configBlock}>
+                    <Text style={styles.configLabel}>Paper Width:</Text>
+                    <View style={styles.pillRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.pill,
+                          paperWidth === 80 && styles.pillActive,
+                        ]}
+                        onPress={() => setPaperWidth(80)}
+                      >
+                        <Text
+                          style={[
+                            styles.pillText,
+                            paperWidth === 80 && styles.pillTextActive,
+                          ]}
+                        >
+                          80 mm (3-inch Roll)
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.pill,
+                          paperWidth === 58 && styles.pillActive,
+                        ]}
+                        onPress={() => setPaperWidth(58)}
+                      >
+                        <Text
+                          style={[
+                            styles.pillText,
+                            paperWidth === 58 && styles.pillTextActive,
+                          ]}
+                        >
+                          58 mm (2-inch Roll)
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Action Print Button */}
+                  <TouchableOpacity
+                    style={styles.primaryPrintBtn}
+                    onPress={handlePrintBluetoothDirect}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="flash" size={20} color="#FFFFFF" />
+                    <Text style={styles.primaryPrintBtnText}>
+                      Print to {selectedDevice.name.split(' ')[0]} (Bluetooth)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* --- WI-FI / NETWORK A4 GST SECTION --- */
+                <View style={styles.wifiSection}>
+                  <View style={styles.wifiCard}>
+                    <View style={styles.wifiHeader}>
+                      <View style={styles.wifiIconBox}>
+                        <Ionicons name="document-text" size={28} color="#0284C7" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.wifiTitle}>A4 Statutory GST Tax Invoice</Text>
+                        <Text style={styles.wifiSubtitle}>
+                          Standard GST Section 31 A4 Invoice with HSN breakdown, CGST, SGST, bank details & seal.
+                        </Text>
                       </View>
                     </View>
-                    <Text style={styles.cardDesc}>
-                      High-speed receipt roll print for POS counters via Bluetooth.
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-                </TouchableOpacity>
-
-                {/* Paper width selector chips */}
-                <View style={styles.paperWidthRow}>
-                  <Text style={styles.paperWidthLabel}>Paper Roll Width:</Text>
-                  <View style={styles.paperWidthPills}>
-                    <TouchableOpacity
-                      style={[
-                        styles.paperWidthPill,
-                        paperWidth === 80 && styles.paperWidthPillActive,
-                      ]}
-                      onPress={() => setPaperWidth(80)}
-                    >
-                      <Text
-                        style={[
-                          styles.paperWidthText,
-                          paperWidth === 80 && styles.paperWidthTextActive,
-                        ]}
-                      >
-                        80 mm (3-inch)
-                      </Text>
-                    </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[
-                        styles.paperWidthPill,
-                        paperWidth === 58 && styles.paperWidthPillActive,
-                      ]}
-                      onPress={() => setPaperWidth(58)}
+                      style={[styles.primaryPrintBtn, { backgroundColor: '#0284C7' }]}
+                      onPress={handlePrintWifiA4}
+                      activeOpacity={0.8}
                     >
-                      <Text
-                        style={[
-                          styles.paperWidthText,
-                          paperWidth === 58 && styles.paperWidthTextActive,
-                        ]}
-                      >
-                        58 mm (2-inch)
-                      </Text>
+                      <Ionicons name="print" size={20} color="#FFFFFF" />
+                      <Text style={styles.primaryPrintBtnText}>Print A4 via Wi-Fi / LAN</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              </View>
+              )}
 
-              {/* Option 3: Share PDF options */}
-              <View style={styles.shareRow}>
-                <TouchableOpacity
-                  style={styles.shareBtn}
-                  onPress={handleShareA4Pdf}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="document-text-outline" size={18} color={COLORS.primary} />
-                  <Text style={styles.shareBtnText}>Share A4 PDF</Text>
-                </TouchableOpacity>
+              {/* Share PDF Fallbacks */}
+              <View style={styles.shareSection}>
+                <Text style={styles.shareTitle}>Quick Share:</Text>
+                <View style={styles.shareRow}>
+                  <TouchableOpacity
+                    style={styles.shareBtn}
+                    onPress={handleShareA4Pdf}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="document-text-outline" size={18} color={COLORS.primary} />
+                    <Text style={styles.shareBtnText}>Share A4 PDF</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.shareBtn}
-                  onPress={handleShareThermalPdf}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="receipt-outline" size={18} color="#10B981" />
-                  <Text style={[styles.shareBtnText, { color: '#059669' }]}>Share Thermal PDF</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.shareBtn}
+                    onPress={handleShareThermalPdf}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="receipt-outline" size={18} color={COLORS.secondary} />
+                    <Text style={[styles.shareBtnText, { color: COLORS.secondary }]}>
+                      Share Thermal PDF
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            </ScrollView>
           )}
         </View>
       </View>
@@ -250,25 +421,26 @@ export const PrintOptionsModal: React.FC<PrintOptionsModalProps> = ({
 const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(10, 37, 64, 0.75)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: 32,
-    ...SHADOWS.card,
+    maxHeight: '90%',
+    paddingBottom: 24,
+    ...SHADOWS.floating,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    paddingHorizontal: 20,
+    paddingTop: 18,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F1F5F9',
   },
   headerTitleBox: {
     flexDirection: 'row',
@@ -278,167 +450,263 @@ const styles = StyleSheet.create({
   printerIconCircle: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 14,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#0A2540',
   },
   headerSubtitle: {
-    fontSize: 11.5,
+    fontSize: 12,
     color: '#64748B',
     marginTop: 2,
   },
   closeBtn: {
     padding: 6,
   },
-  optionsList: {
-    gap: 14,
+  tabSwitcher: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
+    gap: 6,
   },
-  printerCard: {
+  tabBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 9,
+    gap: 8,
+  },
+  tabBtnActive: {
+    backgroundColor: COLORS.primary,
+    ...SHADOWS.card,
+  },
+  tabBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  tabBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  scrollBody: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  bluetoothSection: {
+    marginTop: 6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0A2540',
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 5,
+  },
+  greenDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  onlineBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  deviceList: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  deviceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     gap: 12,
   },
-  cardIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  deviceCardSelected: {
+    borderColor: COLORS.secondary,
+    backgroundColor: '#FFF7F2',
+  },
+  deviceIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardContent: {
+  deviceInfo: {
     flex: 1,
   },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+  deviceName: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1E293B',
-  },
-  a4Badge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  a4BadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#2563EB',
-  },
-  thermalBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  thermalBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  cardDesc: {
-    fontSize: 11.5,
+  deviceSub: {
+    fontSize: 11,
     color: '#64748B',
-    lineHeight: 16,
+    marginTop: 2,
   },
-  thermalCardWrapper: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
+  configBlock: {
+    marginBottom: 14,
   },
-  paperWidthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#F1F5F9',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  paperWidthLabel: {
+  configLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#475569',
+    color: '#334155',
+    marginBottom: 6,
   },
-  paperWidthPills: {
+  pillRow: {
     flexDirection: 'row',
     gap: 8,
   },
-  paperWidthPill: {
+  pill: {
+    flex: 1,
+    paddingVertical: 9,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 9,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  paperWidthPillActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+  pillActive: {
+    borderColor: COLORS.secondary,
+    backgroundColor: '#FFF2EB',
   },
-  paperWidthText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
-  paperWidthTextActive: {
+  pillTextActive: {
+    color: COLORS.secondary,
+    fontWeight: '800',
+  },
+  primaryPrintBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.secondary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 6,
+    ...SHADOWS.card,
+  },
+  primaryPrintBtnText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  wifiSection: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  wifiCard: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  wifiHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  wifiIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wifiTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0369A1',
+  },
+  wifiSubtitle: {
+    fontSize: 12,
+    color: '#0284C7',
+    marginTop: 3,
+    lineHeight: 16,
+  },
+  shareSection: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  shareTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 8,
   },
   shareRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
+    gap: 10,
   },
   shareBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
+    backgroundColor: '#FFFFFF',
+    gap: 6,
   },
   shareBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
   },
   printingStateBox: {
-    paddingVertical: 36,
+    padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 14,
   },
   printingStateText: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#334155',
+    color: '#0A2540',
     textAlign: 'center',
   },
 });

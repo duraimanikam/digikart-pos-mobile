@@ -15,20 +15,24 @@ import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { ScreenName } from './HomeScreen';
 import { PrintOptionsModal } from '../components/PrintOptionsModal';
-import { DEFAULT_SETTINGS } from '../database/sqlite';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { DEFAULT_SETTINGS, dbService } from '../database/sqlite';
 import { Invoice } from '../types';
 
 interface SettingsScreenProps {
   onBack: () => void;
   onNavigate: (screen: ScreenName) => void;
+  onResetComplete?: () => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onBack,
   onNavigate,
+  onResetComplete,
 }) => {
   const [cloudSyncEnabled, setCloudSyncEnabled] = React.useState(true);
   const [isPrinterModalOpen, setIsPrinterModalOpen] = React.useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
 
   // Test Invoice for Printer Testing
   const sampleInvoice: Invoice = {
@@ -63,6 +67,42 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         totalAmount: 100.0,
       },
     ],
+  };
+
+  const handleTriggerDemoReset = () => {
+    Alert.alert(
+      '⚠️ Complete Reset (Post-Demo Clean)',
+      'This will wipe all demo invoices, reset customer balances to ₹0, clear cash register shifts, and restore clean initial product inventory.\n\nChoose an option:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset (Keep Current Password)',
+          style: 'default',
+          onPress: async () => {
+            await dbService.resetAllData(false);
+            onResetComplete?.();
+            Alert.alert(
+              'Reset Completed',
+              'All demo bills and transactions have been wiped. Current login password was kept.',
+              [{ text: 'OK', onPress: () => onNavigate('home') }]
+            );
+          },
+        },
+        {
+          text: 'Full Reset (Password = 1234)',
+          style: 'destructive',
+          onPress: async () => {
+            await dbService.resetAllData(true);
+            onResetComplete?.();
+            Alert.alert(
+              'Showroom Reset Complete',
+              'App is restored to pristine showroom condition! Admin password is reset to 1234.',
+              [{ text: 'OK', onPress: () => onNavigate('home') }]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const settingsList = [
@@ -121,17 +161,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       title: 'App Theme',
       icon: 'color-palette-outline',
       color: '#F59E0B',
-      action: () => Alert.alert('Theme', 'Royal Purple Theme (Active)'),
+      action: () => Alert.alert('Theme', 'TamilVelai Dark Navy & Orange Brand Theme (Active)'),
+    },
+    {
+      id: 'change_password',
+      title: 'Change Login Password',
+      icon: 'key-outline',
+      color: COLORS.secondary,
+      action: () => setIsPasswordModalOpen(true),
+    },
+    {
+      id: 'demo_reset',
+      title: 'Complete Reset (After Demo)',
+      icon: 'refresh-circle-outline',
+      color: COLORS.danger,
+      action: handleTriggerDemoReset,
     },
     {
       id: 'about',
       title: 'About',
       icon: 'information-circle-outline',
-      color: '#4F46B8',
+      color: COLORS.primary,
       action: () =>
         Alert.alert(
           'About DigiKart POS',
-          'v1.0.0 | DigiKart POS\nRetail Billing Made Simple\nOffline First • GST Ready • Photo AI Scan'
+          'v1.0.0 | DigiKart POS\nRetail Billing Made Simple\nOffline First • GST Ready • Bluetooth Thermal & Wi-Fi A4'
         ),
     },
   ];
@@ -176,6 +230,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           ))}
         </View>
 
+        {/* Demo Clean & Handover Dedicated Card */}
+        <View style={styles.demoCard}>
+          <View style={styles.demoHeader}>
+            <Ionicons name="sparkles" size={20} color={COLORS.secondary} />
+            <Text style={styles.demoTitle}>Post-Demo Client Handover</Text>
+          </View>
+          <Text style={styles.demoDesc}>
+            Demonstrated the app to a store owner? One-click reset clears all test bills, invoices, and shift registers to give them a 100% clean, fresh showroom database.
+          </Text>
+          <TouchableOpacity
+            style={styles.demoBtn}
+            onPress={handleTriggerDemoReset}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh-circle" size={20} color="#FFFFFF" />
+            <Text style={styles.demoBtnText}>Complete Reset (After Demo)</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Quick Nav to Screen 11 (Login) */}
         <TouchableOpacity
           style={styles.logoutBtn}
@@ -193,6 +266,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         onClose={() => setIsPrinterModalOpen(false)}
         invoice={sampleInvoice}
         settings={DEFAULT_SETTINGS}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        visible={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
       />
     </SafeAreaView>
   );
@@ -259,6 +338,47 @@ const styles = StyleSheet.create({
   logoutBtnText: {
     color: COLORS.danger,
     fontSize: 14,
+    fontWeight: '700',
+  },
+  demoCard: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#FED7AA',
+    padding: 16,
+    marginTop: 20,
+    ...SHADOWS.card,
+  },
+  demoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  demoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#9A3412',
+  },
+  demoDesc: {
+    fontSize: 12.5,
+    color: '#7C2D12',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  demoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.secondary,
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  demoBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
     fontWeight: '700',
   },
 });

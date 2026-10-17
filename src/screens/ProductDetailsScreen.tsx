@@ -16,6 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { AppHeader } from '../components/AppHeader';
 import { COLORS, SHADOWS } from '../theme/colors';
 import { Product } from '../types';
+import { DedicatedBarcodeScannerModal } from '../components/DedicatedBarcodeScannerModal';
+import { VoiceItemEntryModal } from '../components/VoiceItemEntryModal';
 
 interface ProductDetailsScreenProps {
   product?: Product | null;
@@ -47,6 +49,8 @@ export const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
   const [openingStock, setOpeningStock] = useState(
     product ? String(product.stock) : '45'
   );
+  const [isBarcodeModalVisible, setIsBarcodeModalVisible] = useState(false);
+  const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
 
   const handlePickImage = async () => {
     try {
@@ -120,6 +124,24 @@ export const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
           </View>
         </View>
 
+        {/* Voice Auto-Fill Bar */}
+        <TouchableOpacity
+          style={styles.voiceFillBtn}
+          onPress={() => setIsVoiceModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.voiceIconBubble}>
+            <Ionicons name="mic" size={16} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.voiceFillTitle}>Voice Item Entry</Text>
+            <Text style={styles.voiceFillSubtitle}>
+              Tap & speak: e.g. "Tata Tea Gold 500 grams selling price 320 stock 50"
+            </Text>
+          </View>
+          <Ionicons name="sparkles" size={16} color={COLORS.secondary} />
+        </TouchableOpacity>
+
         {/* Form Fields matching Screen 7 */}
         <View style={styles.formCard}>
           {/* Product Name */}
@@ -136,7 +158,7 @@ export const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
 
           {/* Barcode with Scan Icon */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Barcode</Text>
+            <Text style={styles.inputLabel}>Barcode (1D / QR Code)</Text>
             <View style={styles.inputWithIcon}>
               <TextInput
                 style={styles.inputFieldInner}
@@ -147,7 +169,7 @@ export const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
               />
               <TouchableOpacity
                 style={styles.scanBtn}
-                onPress={onOpenScanner}
+                onPress={() => setIsBarcodeModalVisible(true)}
                 activeOpacity={0.7}
               >
                 <Ionicons name="scan-outline" size={20} color={COLORS.primary} />
@@ -236,6 +258,34 @@ export const ProductDetailsScreen: React.FC<ProductDetailsScreenProps> = ({
           <Text style={styles.saveBtnText}>Save Product</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Dedicated Continuous Barcode & QR Laser Scanner Modal */}
+      <DedicatedBarcodeScannerModal
+        visible={isBarcodeModalVisible}
+        onClose={() => setIsBarcodeModalVisible(false)}
+        onScan={(code: string) => {
+          setBarcode(code);
+          setIsBarcodeModalVisible(false);
+        }}
+        title="Scan Product Barcode"
+      />
+
+      {/* Voice to Item Entry Modal */}
+      <VoiceItemEntryModal
+        visible={isVoiceModalVisible}
+        onClose={() => setIsVoiceModalVisible(false)}
+        targetScreen="products"
+        onItemConfirmed={(item) => {
+          setName(item.name);
+          setSellingRate(String(item.price));
+          setPurchaseRate(String(Math.round(item.price * 0.8)));
+          setOpeningStock(String(item.quantity || 50));
+          if (item.unit) {
+            setUnit(item.unit);
+          }
+          setIsVoiceModalVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -368,5 +418,36 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  voiceFillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FED7AA',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    gap: 10,
+    ...SHADOWS.card,
+  },
+  voiceIconBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceFillTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#9A3412',
+  },
+  voiceFillSubtitle: {
+    fontSize: 11,
+    color: '#C2410C',
+    marginTop: 1,
   },
 });
