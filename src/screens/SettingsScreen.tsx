@@ -185,7 +185,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       action: () =>
         Alert.alert(
           'About DigiKart POS',
-          'v1.0.0 | DigiKart POS\nRetail Billing Made Simple\nOffline First • GST Ready • Bluetooth Thermal & Wi-Fi A4'
+          'v1.1.0 Commercial Edition | DigiKart POS\nRetail Billing Made Simple\nOffline First • GST Ready • TamilVelai Theme • Dedicated Barcode/QR • Voice Entry • ESC/POS & TSC Thermal • Demo Reset'
         ),
     },
   ];

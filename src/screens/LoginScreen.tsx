@@ -163,7 +163,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
         {/* Footer */}
         <View style={styles.footerSection}>
-          <Text style={styles.footerVersion}>v1.0.0 | DigiKart POS</Text>
+          <Text style={styles.footerVersion}>v1.1.0 Commercial Edition | DigiKart POS</Text>
           <Text style={styles.footerTagline}>
             Simple Billing • Stock • Reports • GST
           </Text>

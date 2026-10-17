@@ -14,6 +14,8 @@ jobs:
   build-apk:
     name: Build Standalone Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 1. Checkout Repository
@@ -50,13 +52,49 @@ jobs:
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon --stacktrace -Pexpo.useLegacyPackaging=true -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+          cd ..
+          mkdir -p release-apk
+          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -n "$APK_FILE" ]; then
+            cp "$APK_FILE" release-apk/DigiKart-POS-v1.1.0-Release.apk
+            echo "Successfully prepared release-apk/DigiKart-POS-v1.1.0-Release.apk"
+          fi
+          ls -lh release-apk/
 
       - name: 10. Upload APK Artifact to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: DigiKart-POS-Android-APK
-          path: android/app/build/outputs/apk/**/*.apk
+          name: DigiKart-POS-v1.1.0-Release-APK
+          path: release-apk/*.apk
           retention-days: 30
+
+      - name: 11. Publish to GitHub Releases (Direct 1-Click Download)
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          tag_name: v1.1.0
+          name: DigiKart POS v1.1.0 (Commercial Edition)
+          draft: false
+          prerelease: false
+          body: |
+            ## 🚀 DigiKart POS v1.1.0 Commercial Edition
+
+            ### ✨ What's New in this Version:
+            - **Dedicated Continuous Laser Barcode & QR Code Scanner** (1D EAN/UPC/Code128 + 2D QR Code).
+            - **Voice-to-Item Entry** in Billing (`NewBillScreen`), Product Master (`ProductDetailsScreen`), and Purchase Entry (`DetailedPurchaseEntryScreen`).
+            - **Bluetooth Thermal Printer Direct Streaming** (Lists paired Bluetooth devices like POS-80, XP-58, TSC TE244, TVS RP-3150 instead of system Wi-Fi spooler).
+            - **ESC/POS & TSC TSPL Protocols** (Supports both receipt rolls and barcode sticker labels).
+            - **Complete Demo Reset** (Post-Demo Client Handover) in Settings to wipe mock bills and restore clean catalog.
+            - **TamilVelai Brand Colors** (Dark Navy Blue `#0A2540` & Vibrant Orange `#FF6600`).
+            - **Admin Password Change** feature in Settings.
+            - **Fixed Android Status Bar Overlay** padding across all screens.
+
+            ### 📲 Direct APK Download:
+            Download **`DigiKart-POS-v1.1.0-Release.apk`** below.
+            *(If you already have an older build installed on your phone, uninstall the old app first before installing this new APK).*
+          files: release-apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   eas-cloud-build:
     name: Optional EAS Cloud Build (If EXPO_TOKEN is configured)

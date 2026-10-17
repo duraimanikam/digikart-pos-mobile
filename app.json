@@ -2,9 +2,9 @@
   "expo": {
     "name": "DigiKart POS",
     "slug": "digikart-pos",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
-    "primaryColor": "#4F46B8",
+    "primaryColor": "#0A2540",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
@@ -12,8 +12,9 @@
     },
     "android": {
       "package": "com.digikart.pos",
+      "versionCode": 2,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0A2540",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
